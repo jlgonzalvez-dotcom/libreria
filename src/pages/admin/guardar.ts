@@ -27,10 +27,11 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 
   const titulo = String(datos.get('titulo') ?? '').trim();
   const autor = String(datos.get('autor') ?? '').trim();
-  const categoria = String(datos.get('categoria') ?? '').trim();
+  // Categoría opcional: si va vacía, se guarda como "Sin categoría".
+  const categoria = String(datos.get('categoria') ?? '').trim() || 'Sin categoría';
 
-  // Validación mínima en servidor (los campos ya son required en el HTML).
-  if (!titulo || !autor || !categoria) {
+  // Solo título y autor son obligatorios.
+  if (!titulo || !autor) {
     return redirect(id ? `/admin/${id}` : '/admin/nuevo');
   }
 

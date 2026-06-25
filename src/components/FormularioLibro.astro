@@ -87,8 +87,8 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
 
     <div class="fila-2">
       <div class="campo">
-        <label for="categoria">Categoría *</label>
-        <input id="categoria" name="categoria" type="text" value={v.categoria} list="lista-categorias" required />
+        <label for="categoria">Categoría <small class="ayuda">(opcional)</small></label>
+        <input id="categoria" name="categoria" type="text" value={v.categoria} list="lista-categorias" placeholder="si la dejas vacía: Sin categoría" />
         <datalist id="lista-categorias">
           {categorias.map((c) => <option value={c} />)}
         </datalist>
@@ -240,7 +240,7 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
 <div id="escaner-modal" class="escaner-modal" hidden>
   <div class="escaner-caja">
     <p class="escaner-titulo">Apunta al código de barras del libro</p>
-    <video id="escaner-video" class="escaner-video" muted playsinline></video>
+    <video id="escaner-video" class="escaner-video" autoplay muted playsinline></video>
     <p id="escaner-msg" class="ayuda"></p>
     <button type="button" id="escaner-cerrar" class="btn-secundario">Cancelar</button>
   </div>
@@ -269,6 +269,31 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
     }
   }
 
+  // Reduce y normaliza cualquier imagen (JPEG, PNG, HEIC… lo que el navegador
+  // sepa decodificar) a un JPEG de máx. 1600 px. Así una foto grande entra en el
+  // límite de 5 MB y el OCR va más rápido. Si algo falla, devuelve el original.
+  async function prepararImagen(file: File): Promise<File> {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const max = 1600;
+      const escala = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+      const w = Math.round(bitmap.width * escala);
+      const h = Math.round(bitmap.height * escala);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return file;
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      bitmap.close?.();
+      const blob: Blob | null = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.85));
+      if (!blob) return file;
+      return new File([blob], 'portada.jpg', { type: 'image/jpeg' });
+    } catch {
+      return file;
+    }
+  }
+
   // Si la imagen pegada/subida no carga, avisar y mostrar el placeholder.
   portadaImg?.addEventListener('error', () => {
     if (portadaImg.getAttribute('src')) {
@@ -284,10 +309,12 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
   });
 
   fileInput?.addEventListener('change', async () => {
-    const file = fileInput.files?.[0];
-    if (!file) return;
+    const original = fileInput.files?.[0];
+    if (!original) return;
+    if (portadaMsg) portadaMsg.textContent = 'Procesando imagen…';
+    const file = await prepararImagen(original);
     if (file.size > 5 * 1024 * 1024) {
-      if (portadaMsg) portadaMsg.textContent = 'La imagen supera los 5 MB.';
+      if (portadaMsg) portadaMsg.textContent = 'La imagen es demasiado grande (máx. 5 MB).';
       fileInput.value = '';
       return;
     }
@@ -368,12 +395,18 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
   const video = $('escaner-video') as HTMLVideoElement | null;
   const escMsg = $('escaner-msg');
   let escControls: { stop: () => void } | null = null;
+  let escStream: MediaStream | null = null;
 
   function cerrarEscaner() {
     if (escControls) {
       try { escControls.stop(); } catch { /* noop */ }
       escControls = null;
     }
+    if (escStream) {
+      escStream.getTracks().forEach((t) => t.stop());
+      escStream = null;
+    }
+    if (video) video.srcObject = null;
     if (modal) modal.hidden = true;
   }
 
@@ -384,23 +417,47 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
     modal.hidden = false;
     if (escMsg) escMsg.textContent = 'Iniciando cámara…';
     try {
-      const { BrowserMultiFormatReader } = await import('@zxing/browser');
-      const reader = new BrowserMultiFormatReader();
-      escControls = await reader.decodeFromConstraints(
-        { video: { facingMode: 'environment' } },
-        video,
-        (result, _err, controls) => {
-          if (!result) return;
-          controls.stop();
-          escControls = null;
-          if (modal) modal.hidden = true;
-          if (isbnInput) isbnInput.value = result.getText();
-          autocompletar();
-        },
-      );
-      if (escMsg) escMsg.textContent = 'Enfoca el código de barras (ISBN) de la contraportada.';
+      // Preferir cámara trasera (móvil) y la mayor resolución posible (para leer
+      // mejor códigos pequeños). Si no existe (portátil), usar cualquiera.
+      const restriccion = {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      };
+      try {
+        escStream = await navigator.mediaDevices.getUserMedia({ video: restriccion });
+      } catch {
+        escStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+      video.srcObject = escStream;
+      await video.play().catch(() => { /* algunos navegadores reproducen solos */ });
+
+      const [{ BrowserMultiFormatReader }, { DecodeHintType, BarcodeFormat }] = await Promise.all([
+        import('@zxing/browser'),
+        import('@zxing/library'),
+      ]);
+      // Centrarse en los formatos de libros/productos y esforzarse más por frame.
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+      ]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      const reader = new BrowserMultiFormatReader(hints);
+
+      escControls = await reader.decodeFromStream(escStream, video, (result, _err, controls) => {
+        if (!result) return;
+        controls.stop();
+        const code = result.getText();
+        cerrarEscaner();
+        if (isbnInput) isbnInput.value = code;
+        autocompletar();
+      });
+      if (escMsg) escMsg.textContent = 'Acerca el código de barras, con buena luz, hasta que enfoque.';
     } catch {
-      if (escMsg) escMsg.textContent = 'No se pudo abrir la cámara. Permite el acceso o escribe el ISBN a mano.';
+      if (escMsg) escMsg.textContent = 'No se pudo abrir la cámara. Da permiso (icono de cámara en la barra) o escribe el ISBN a mano.';
     }
   });
 
@@ -431,23 +488,32 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
   }
 
   ocrFile?.addEventListener('change', async () => {
-    const file = ocrFile.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      if (portadaMsg) portadaMsg.textContent = 'La imagen supera los 5 MB.';
-      ocrFile.value = '';
-      return;
-    }
-    if (portadaMsg) portadaMsg.textContent = 'Preparando el lector de texto…';
+    const original = ocrFile.files?.[0];
+    if (!original) return;
+    if (portadaMsg) portadaMsg.textContent = 'Procesando la foto…';
+    const file = await prepararImagen(original);
+
+    // 1) LO FIABLE: usar tu foto como portada (aparece enseguida, sin depender del OCR).
+    if (portadaMsg) portadaMsg.textContent = 'Guardando tu foto como portada…';
+    await subirComoPortada(file);
+
+    // 2) EXTRA (mejor esfuerzo): leer el título con OCR para autocompletar los datos.
     try {
-      const Tesseract = (await import('tesseract.js')).default;
-      const { data } = await Tesseract.recognize(file, 'spa+eng', {
+      if (portadaMsg) portadaMsg.textContent = 'Portada lista. Cargando el lector de texto…';
+      // El worker/core de Tesseract se cargan desde CDN (dentro del empaquetado
+      // de Astro la ruta local del worker falla).
+      const { createWorker } = await import('tesseract.js');
+      const worker = await createWorker('spa+eng', 1, {
+        workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@7/dist/worker.min.js',
+        corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@7',
         logger: (m: any) => {
           if (m.status === 'recognizing text' && portadaMsg) {
-            portadaMsg.textContent = `Leyendo la portada… ${Math.round((m.progress ?? 0) * 100)}%`;
+            portadaMsg.textContent = `Leyendo el título… ${Math.round((m.progress ?? 0) * 100)}%`;
           }
         },
       });
+      const { data } = await worker.recognize(file);
+      await worker.terminate();
 
       // Líneas legibles, de la más larga a la más corta (la más larga suele ser el título).
       const lineas = (data.text || '')
@@ -457,12 +523,10 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
         .sort((a, b) => b.length - a.length);
 
       if (lineas.length === 0) {
-        if (portadaMsg) portadaMsg.textContent = 'No se pudo leer texto. Prueba con más luz, o escribe el título a mano.';
-        await subirComoPortada(file);
+        if (portadaMsg) portadaMsg.textContent = 'Portada guardada. No leí texto claro; escribe el título o el ISBN y pulsa "Buscar datos".';
         return;
       }
 
-      // Probar varias consultas a partir del texto leído.
       const intentos = [lineas[0], lineas[1] ? `${lineas[0]} ${lineas[1]}` : '', lineas[1] ?? '']
         .filter((q, i, a) => q !== '' && a.indexOf(q) === i);
 
@@ -475,17 +539,14 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
 
       if (encontrado) {
         aplicarResultado(encontrado);
-        if (!encontrado.portada && portadaInput && !portadaInput.value) await subirComoPortada(file);
-        if (portadaMsg) portadaMsg.textContent = `Datos de ${encontrado.fuente} (texto leído de la foto). Revísalos.`;
+        if (portadaMsg) portadaMsg.textContent = `Datos de ${encontrado.fuente} (leídos de la foto). Revísalos.`;
       } else {
-        // Sin coincidencia: al menos dejamos el texto leído en el título y la foto como portada.
         const tituloEl = $('titulo') as HTMLInputElement | null;
         if (tituloEl && !tituloEl.value) tituloEl.value = lineas[0];
-        await subirComoPortada(file);
-        if (portadaMsg) portadaMsg.textContent = 'No encontré el libro; he puesto el texto leído en el título y tu foto como portada.';
+        if (portadaMsg) portadaMsg.textContent = 'Portada guardada y título leído. No lo encontré en las bases de datos; revísalo o usa el ISBN.';
       }
     } catch {
-      if (portadaMsg) portadaMsg.textContent = 'No se pudo leer la imagen. Inténtalo de nuevo.';
+      if (portadaMsg) portadaMsg.textContent = 'Portada guardada. No pude leer el título automáticamente; escríbelo o usa el ISBN y "Buscar datos".';
     } finally {
       ocrFile.value = '';
     }
