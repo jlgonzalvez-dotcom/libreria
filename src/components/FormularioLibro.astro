@@ -1,0 +1,343 @@
+---
+import type { Libro } from '../lib/libros';
+import {
+  ESTADOS,
+  FORMATOS,
+  ESTADOS_CONSERVACION,
+  CATEGORIAS_SUGERIDAS,
+  IDIOMAS,
+} from '../lib/libros';
+
+interface Props {
+  libro?: Libro | null;
+  categoriasExistentes?: string[];
+  error?: string;
+}
+
+const { libro = null, categoriasExistentes = [], error = '' } = Astro.props;
+
+// Valores actuales (vacíos al crear).
+const v = {
+  titulo: libro?.titulo ?? '',
+  autor: libro?.autor ?? '',
+  autores_extra: (libro?.autores_extra ?? []).join(', '),
+  categoria: libro?.categoria ?? '',
+  subcategorias: (libro?.subcategorias ?? []).join(', '),
+  etiquetas: (libro?.etiquetas ?? []).join(', '),
+  anio: libro?.anio ?? '',
+  idioma: libro?.idioma ?? 'Español',
+  editorial: libro?.editorial ?? '',
+  isbn: libro?.isbn ?? '',
+  paginas: libro?.paginas ?? '',
+  estado: libro?.estado ?? 'pendiente',
+  valoracion: libro?.valoracion ?? '',
+  ubicacion: libro?.ubicacion ?? '',
+  formato: libro?.formato ?? 'papel',
+  portada: libro?.portada ?? '',
+  sinopsis: libro?.sinopsis ?? '',
+  notas: libro?.notas ?? '',
+  destacado: libro?.destacado ?? false,
+  en_venta: libro?.en_venta ?? false,
+  precio: libro?.precio ?? '',
+  estado_conservacion: libro?.estado_conservacion ?? '',
+  resena: libro?.resena ?? '',
+};
+
+const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes])].sort((a, b) =>
+  a.localeCompare(b, 'es'),
+);
+---
+
+<form method="POST" action="/admin/guardar" class="form-libro">
+  {libro && <input type="hidden" name="id" value={libro.id} />}
+  {error && <p class="aviso error">{error}</p>}
+
+  <fieldset>
+    <legend>Identidad</legend>
+
+    <div class="campo autocompletar">
+      <label for="isbn">ISBN o título (autocompletar)</label>
+      <div class="autocompletar-fila">
+        <input id="isbn" name="isbn" type="text" value={v.isbn} placeholder="978… o título del libro" />
+        <button type="button" id="btn-autocompletar" class="btn-secundario">Buscar datos</button>
+      </div>
+      <small id="autocompletar-msg" class="ayuda"></small>
+    </div>
+
+    <div class="campo">
+      <label for="titulo">Título *</label>
+      <input id="titulo" name="titulo" type="text" value={v.titulo} required />
+    </div>
+
+    <div class="fila-2">
+      <div class="campo">
+        <label for="autor">Autor *</label>
+        <input id="autor" name="autor" type="text" value={v.autor} required />
+      </div>
+      <div class="campo">
+        <label for="autores_extra">Coautores</label>
+        <input id="autores_extra" name="autores_extra" type="text" value={v.autores_extra} placeholder="separados por comas" />
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Clasificación</legend>
+
+    <div class="fila-2">
+      <div class="campo">
+        <label for="categoria">Categoría *</label>
+        <input id="categoria" name="categoria" type="text" value={v.categoria} list="lista-categorias" required />
+        <datalist id="lista-categorias">
+          {categorias.map((c) => <option value={c} />)}
+        </datalist>
+      </div>
+      <div class="campo">
+        <label for="subcategorias">Subcategorías / géneros</label>
+        <input id="subcategorias" name="subcategorias" type="text" value={v.subcategorias} placeholder="separadas por comas" />
+      </div>
+    </div>
+
+    <div class="campo">
+      <label for="etiquetas">Etiquetas</label>
+      <input id="etiquetas" name="etiquetas" type="text" value={v.etiquetas} placeholder="separadas por comas" />
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Datos bibliográficos</legend>
+
+    <div class="fila-3">
+      <div class="campo">
+        <label for="anio">Año</label>
+        <input id="anio" name="anio" type="number" value={v.anio} min="0" max="2100" />
+      </div>
+      <div class="campo">
+        <label for="paginas">Páginas</label>
+        <input id="paginas" name="paginas" type="number" value={v.paginas} min="0" />
+      </div>
+      <div class="campo">
+        <label for="idioma">Idioma</label>
+        <select id="idioma" name="idioma">
+          {IDIOMAS.map((i) => <option value={i} selected={i === v.idioma}>{i}</option>)}
+        </select>
+      </div>
+    </div>
+
+    <div class="campo">
+      <label for="editorial">Editorial</label>
+      <input id="editorial" name="editorial" type="text" value={v.editorial} />
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>En tu biblioteca</legend>
+
+    <div class="fila-3">
+      <div class="campo">
+        <label for="estado">Estado de lectura</label>
+        <select id="estado" name="estado">
+          {ESTADOS.map((e) => <option value={e} selected={e === v.estado}>{e}</option>)}
+        </select>
+      </div>
+      <div class="campo">
+        <label for="formato">Formato</label>
+        <select id="formato" name="formato">
+          {FORMATOS.map((f) => <option value={f} selected={f === v.formato}>{f}</option>)}
+        </select>
+      </div>
+      <div class="campo">
+        <label for="valoracion">Valoración</label>
+        <select id="valoracion" name="valoracion">
+          <option value="" selected={v.valoracion === ''}>Sin valorar</option>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <option value={n} selected={String(v.valoracion) === String(n)}>{'★'.repeat(n)}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+
+    <div class="campo">
+      <label for="ubicacion">Ubicación física</label>
+      <input id="ubicacion" name="ubicacion" type="text" value={v.ubicacion} placeholder="p. ej. Salón — estantería A" />
+    </div>
+
+    <label class="check">
+      <input type="checkbox" name="destacado" checked={v.destacado} />
+      Destacar en el catálogo
+    </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Presentación</legend>
+
+    <div class="campo">
+      <label>Portada</label>
+      <div class="portada-editor">
+        <div class="portada-preview">
+          <img id="portada-img" src={v.portada} alt="Vista previa de la portada" style={v.portada ? '' : 'display:none'} />
+          <span id="portada-placeholder" class="portada-placeholder" style={v.portada ? 'display:none' : ''}>Sin portada</span>
+        </div>
+        <div class="portada-controles">
+          <input type="file" id="portada-file" accept="image/*" hidden />
+          <label for="portada-file" class="btn-secundario portada-btn">Subir imagen…</label>
+          <small class="ayuda">Sube una foto (JPG/PNG/WebP, máx. 5 MB), pega una URL, o usa "Buscar datos" por ISBN.</small>
+          <input id="portada" name="portada" type="text" value={v.portada} placeholder="https://… (URL de la portada)" />
+          <small id="portada-msg" class="ayuda"></small>
+        </div>
+      </div>
+    </div>
+    <div class="campo">
+      <label for="sinopsis">Sinopsis</label>
+      <textarea id="sinopsis" name="sinopsis" rows="3">{v.sinopsis}</textarea>
+    </div>
+    <div class="campo">
+      <label for="notas">Notas / reseña <small class="ayuda">(admite Markdown)</small></label>
+      <textarea id="notas" name="notas" rows="6">{v.notas}</textarea>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Venta <small class="ayuda">(opcional, para el futuro)</small></legend>
+
+    <label class="check">
+      <input type="checkbox" name="en_venta" checked={v.en_venta} />
+      Disponible para la venta
+    </label>
+
+    <div class="fila-3">
+      <div class="campo">
+        <label for="precio">Precio (€)</label>
+        <input id="precio" name="precio" type="number" value={v.precio} min="0" step="0.01" />
+      </div>
+      <div class="campo">
+        <label for="estado_conservacion">Estado de conservación</label>
+        <select id="estado_conservacion" name="estado_conservacion">
+          <option value="" selected={v.estado_conservacion === ''}>—</option>
+          {ESTADOS_CONSERVACION.map((e) => (
+            <option value={e} selected={e === v.estado_conservacion}>{e}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+    <div class="campo">
+      <label for="resena">Reseña destacada</label>
+      <textarea id="resena" name="resena" rows="2">{v.resena}</textarea>
+    </div>
+  </fieldset>
+
+  <div class="form-acciones">
+    <button type="submit" class="btn">{libro ? 'Guardar cambios' : 'Añadir libro'}</button>
+    <a href="/admin" class="btn-secundario">Cancelar</a>
+  </div>
+</form>
+
+<script>
+  const $ = (id: string) => document.getElementById(id);
+
+  // ── Portada: previsualización + subida ─────────────────────────────────────
+  const portadaInput = $('portada') as HTMLInputElement | null;
+  const portadaImg = $('portada-img') as HTMLImageElement | null;
+  const portadaPlaceholder = $('portada-placeholder');
+  const fileInput = $('portada-file') as HTMLInputElement | null;
+  const portadaMsg = $('portada-msg');
+
+  function actualizarPreview(url: string) {
+    if (!portadaImg || !portadaPlaceholder) return;
+    if (url) {
+      portadaImg.src = url;
+      portadaImg.style.display = '';
+      portadaPlaceholder.style.display = 'none';
+    } else {
+      portadaImg.removeAttribute('src');
+      portadaImg.style.display = 'none';
+      portadaPlaceholder.style.display = '';
+    }
+  }
+
+  // Si la imagen pegada/subida no carga, avisar y mostrar el placeholder.
+  portadaImg?.addEventListener('error', () => {
+    if (portadaImg.getAttribute('src')) {
+      if (portadaMsg) portadaMsg.textContent = 'No se pudo cargar esa imagen. Revisa la URL.';
+      portadaImg.style.display = 'none';
+      if (portadaPlaceholder) portadaPlaceholder.style.display = '';
+    }
+  });
+
+  portadaInput?.addEventListener('input', () => {
+    if (portadaMsg) portadaMsg.textContent = '';
+    actualizarPreview(portadaInput.value.trim());
+  });
+
+  fileInput?.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      if (portadaMsg) portadaMsg.textContent = 'La imagen supera los 5 MB.';
+      fileInput.value = '';
+      return;
+    }
+    if (portadaMsg) portadaMsg.textContent = 'Subiendo imagen…';
+    const fd = new FormData();
+    fd.append('imagen', file);
+    try {
+      const res = await fetch('/admin/subir-portada', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        if (portadaMsg) portadaMsg.textContent = data.error ?? 'No se pudo subir la imagen.';
+        return;
+      }
+      if (portadaInput) portadaInput.value = data.url;
+      actualizarPreview(data.url);
+      if (portadaMsg) portadaMsg.textContent = 'Imagen subida ✓';
+    } catch {
+      if (portadaMsg) portadaMsg.textContent = 'Error al subir la imagen.';
+    } finally {
+      fileInput.value = '';
+    }
+  });
+
+  // ── Autocompletado por ISBN o título contra /api/autocompletar ─────────────
+  const btn = $('btn-autocompletar') as HTMLButtonElement | null;
+  const isbnInput = $('isbn') as HTMLInputElement | null;
+  const msg = $('autocompletar-msg');
+
+  function set(id: string, valor: unknown) {
+    if (valor == null || valor === '') return;
+    const el = $(id) as HTMLInputElement | HTMLTextAreaElement | null;
+    if (el && !el.value) el.value = String(valor);
+  }
+
+  btn?.addEventListener('click', async () => {
+    const consulta = isbnInput?.value.trim();
+    if (!consulta) {
+      if (msg) msg.textContent = 'Escribe un ISBN o un título primero.';
+      return;
+    }
+    btn.disabled = true;
+    if (msg) msg.textContent = 'Buscando…';
+    try {
+      const res = await fetch(`/api/autocompletar?q=${encodeURIComponent(consulta)}`);
+      const data = await res.json();
+      if (!res.ok || !data.encontrado) {
+        if (msg) msg.textContent = 'No se encontraron datos. Rellénalo a mano.';
+        return;
+      }
+      set('titulo', data.titulo);
+      set('autor', data.autor);
+      set('autores_extra', (data.autores_extra ?? []).join(', '));
+      set('anio', data.anio);
+      set('editorial', data.editorial);
+      set('paginas', data.paginas);
+      set('portada', data.portada);
+      set('sinopsis', data.sinopsis);
+      if (data.isbn && isbnInput) isbnInput.value = data.isbn;
+      if (portadaInput) actualizarPreview(portadaInput.value.trim());
+      if (msg) msg.textContent = `Datos de ${data.fuente}. Revisa y completa lo que falte.`;
+    } catch {
+      if (msg) msg.textContent = 'Error al buscar. Inténtalo de nuevo.';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>

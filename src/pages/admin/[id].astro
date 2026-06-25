@@ -1,0 +1,23 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import FormularioLibro from '../../components/FormularioLibro.astro';
+import { listarLibros, obtenerLibroPorId } from '../../lib/libros';
+
+const { id } = Astro.params;
+const libro = id ? await obtenerLibroPorId(id) : null;
+
+if (!libro) {
+  return Astro.redirect('/admin');
+}
+
+const libros = await listarLibros();
+const categoriasExistentes = [...new Set(libros.map((l) => l.categoria))];
+---
+
+<AdminLayout titulo={`Editar · ${libro.titulo}`}>
+  <section class="contenedor admin-form">
+    <a href="/admin" class="volver">← Volver al listado</a>
+    <h1>Editar libro</h1>
+    <FormularioLibro libro={libro} categoriasExistentes={categoriasExistentes} />
+  </section>
+</AdminLayout>

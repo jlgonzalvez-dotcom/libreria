@@ -1,0 +1,43 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { passwordCorrecta, crearTokenSesion, sesionValida, COOKIE_SESION } from '../../lib/auth';
+
+const volver = Astro.url.searchParams.get('volver') || '/admin';
+
+// Si ya hay sesión válida, no mostrar el login.
+if (await sesionValida(Astro.cookies.get(COOKIE_SESION)?.value)) {
+  return Astro.redirect(volver);
+}
+
+let error = '';
+if (Astro.request.method === 'POST') {
+  const datos = await Astro.request.formData();
+  const password = String(datos.get('password') ?? '');
+  if (passwordCorrecta(password)) {
+    Astro.cookies.set(COOKIE_SESION, await crearTokenSesion(), {
+      httpOnly: true,
+      secure: import.meta.env.PROD,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+    });
+    return Astro.redirect(String(datos.get('volver') || '/admin'));
+  }
+  error = 'Contraseña incorrecta.';
+}
+---
+
+<AdminLayout titulo="Acceso · Admin" mostrarNav={false}>
+  <section class="login-wrap">
+    <form class="login-card" method="POST">
+      <h1>Panel de administración</h1>
+      <p class="login-sub">Introduce la contraseña para gestionar tu biblioteca.</p>
+      <input type="hidden" name="volver" value={volver} />
+      <label for="password">Contraseña</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required autofocus />
+      {error && <p class="error">{error}</p>}
+      <button type="submit" class="btn">Entrar</button>
+      <a href="/" class="login-volver">← Volver al catálogo</a>
+    </form>
+  </section>
+</AdminLayout>

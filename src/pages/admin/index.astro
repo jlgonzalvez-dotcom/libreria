@@ -1,0 +1,74 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { listarLibros } from '../../lib/libros';
+
+const libros = await listarLibros();
+const total = libros.length;
+
+// Posible mensaje de confirmación tras guardar/borrar (?ok=creado|editado|borrado).
+const ok = Astro.url.searchParams.get('ok');
+const mensajes: Record<string, string> = {
+  creado: 'Libro añadido correctamente.',
+  editado: 'Cambios guardados.',
+  borrado: 'Libro eliminado.',
+};
+const aviso = ok ? mensajes[ok] : '';
+---
+
+<AdminLayout titulo="Biblioteca · Admin">
+  <section class="contenedor admin">
+    <div class="admin-top">
+      <div>
+        <h1>Tu biblioteca</h1>
+        <p class="admin-sub">{total} {total === 1 ? 'libro' : 'libros'} en el catálogo.</p>
+      </div>
+      <a href="/admin/nuevo" class="btn">+ Añadir libro</a>
+    </div>
+
+    {aviso && <p class="aviso ok">{aviso}</p>}
+
+    {
+      total === 0 ? (
+        <p class="vacio">Todavía no hay libros. <a href="/admin/nuevo">Añade el primero</a>.</p>
+      ) : (
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>Título</th>
+              <th>Autor</th>
+              <th>Categoría</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {libros.map((libro) => (
+              <tr>
+                <td>
+                  <a href={`/admin/${libro.id}`} class="td-titulo">{libro.titulo}</a>
+                  {libro.destacado && <span class="badge dest">★ destacado</span>}
+                </td>
+                <td>{libro.autor}</td>
+                <td><span class="badge cat">{libro.categoria}</span></td>
+                <td><span class={`estado ${libro.estado}`}>{libro.estado}</span></td>
+                <td class="acciones">
+                  <a href={`/admin/${libro.id}`} class="link-accion">Editar</a>
+                  <a href={`/libros/${libro.slug}/`} target="_blank" class="link-accion">Ver</a>
+                  <form
+                    method="POST"
+                    action="/admin/borrar"
+                    onsubmit="return confirm('¿Eliminar este libro? Esta acción no se puede deshacer.')"
+                    class="form-inline"
+                  >
+                    <input type="hidden" name="id" value={libro.id} />
+                    <button type="submit" class="link-accion borrar">Borrar</button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )
+    }
+  </section>
+</AdminLayout>

@@ -1,66 +1,67 @@
 ---
-import { getCollection, render } from 'astro:content';
+import { marked } from 'marked';
 import Layout from '../../layouts/Layout.astro';
+import { obtenerLibroPorSlug } from '../../lib/libros';
 
-export async function getStaticPaths() {
-  const libros = await getCollection('libros');
-  return libros.map((libro) => ({
-    params: { slug: libro.id },
-    props: { libro },
-  }));
+const { slug } = Astro.params;
+const libro = slug ? await obtenerLibroPorSlug(slug) : null;
+
+if (!libro) {
+  return new Response('Libro no encontrado', { status: 404 });
 }
 
-const { libro } = Astro.props;
-const d = libro.data;
-const { Content } = await render(libro);
-
-function estrellas(n?: number) {
+function estrellas(n?: number | null) {
   if (n == null) return null;
   return '★'.repeat(Math.round(n)) + '☆'.repeat(5 - Math.round(n));
 }
-const autores = [d.autor, ...d.autores_extra].join(', ');
+const autores = [libro.autor, ...libro.autores_extra].join(', ');
+
+// Las notas se escriben en Markdown desde el panel /admin (contenido propio).
+const notasHtml = libro.notas ? marked.parse(libro.notas) : '';
 ---
 
-<Layout titulo={`${d.titulo} — Mi Librería`} descripcion={d.sinopsis ?? d.titulo}>
+<Layout titulo={`${libro.titulo} — Mi Librería`} descripcion={libro.sinopsis ?? libro.titulo}>
   <section class="detalle">
     <div class="contenedor">
       <a class="volver" href="/">← Volver al catálogo</a>
 
       <div class="grid">
         <div class="portada-grande">
-          {d.portada ? <img src={d.portada} alt={`Portada de ${d.titulo}`} /> : d.titulo.charAt(0)}
+          {libro.portada ? <img src={libro.portada} alt={`Portada de ${libro.titulo}`} /> : libro.titulo.charAt(0)}
         </div>
 
         <div>
-          <span class="badge cat">{d.categoria}</span>
-          <h1>{d.titulo}</h1>
+          <span class="badge cat">{libro.categoria}</span>
+          <h1>{libro.titulo}</h1>
           <p class="autor-grande">{autores}</p>
-          {d.sinopsis && <p>{d.sinopsis}</p>}
+          {libro.sinopsis && <p>{libro.sinopsis}</p>}
 
           <div class="ficha">
             <dl>
-              {d.anio && (<><dt>Año</dt><dd>{d.anio}</dd></>)}
-              {d.editorial && (<><dt>Editorial</dt><dd>{d.editorial}</dd></>)}
-              {d.paginas && (<><dt>Páginas</dt><dd>{d.paginas}</dd></>)}
-              <dt>Idioma</dt><dd>{d.idioma}</dd>
-              <dt>Formato</dt><dd>{d.formato}</dd>
-              <dt>Estado</dt><dd><span class={`estado ${d.estado}`}>{d.estado}</span></dd>
-              {d.valoracion != null && (<><dt>Valoración</dt><dd><span class="estrellas">{estrellas(d.valoracion)}</span></dd></>)}
-              {d.isbn && (<><dt>ISBN</dt><dd>{d.isbn}</dd></>)}
-              {d.ubicacion && (<><dt>Ubicación</dt><dd>{d.ubicacion}</dd></>)}
-              {d.subcategorias.length > 0 && (
-                <><dt>Géneros</dt><dd>{d.subcategorias.join(', ')}</dd></>
+              {libro.anio && (<><dt>Año</dt><dd>{libro.anio}</dd></>)}
+              {libro.editorial && (<><dt>Editorial</dt><dd>{libro.editorial}</dd></>)}
+              {libro.paginas && (<><dt>Páginas</dt><dd>{libro.paginas}</dd></>)}
+              <dt>Idioma</dt><dd>{libro.idioma}</dd>
+              <dt>Formato</dt><dd>{libro.formato}</dd>
+              <dt>Estado</dt><dd><span class={`estado ${libro.estado}`}>{libro.estado}</span></dd>
+              {libro.valoracion != null && (<><dt>Valoración</dt><dd><span class="estrellas">{estrellas(libro.valoracion)}</span></dd></>)}
+              {libro.isbn && (<><dt>ISBN</dt><dd>{libro.isbn}</dd></>)}
+              {libro.ubicacion && (<><dt>Ubicación</dt><dd>{libro.ubicacion}</dd></>)}
+              {libro.subcategorias.length > 0 && (
+                <><dt>Géneros</dt><dd>{libro.subcategorias.join(', ')}</dd></>
               )}
-              {d.etiquetas.length > 0 && (
+              {libro.etiquetas.length > 0 && (
                 <><dt>Etiquetas</dt>
-                <dd><div class="tags">{d.etiquetas.map((t) => <span class="badge">{t}</span>)}</div></dd></>
+                <dd><div class="tags">{libro.etiquetas.map((t) => <span class="badge">{t}</span>)}</div></dd></>
+              )}
+              {libro.en_venta && (
+                <><dt>En venta</dt>
+                <dd>{libro.precio != null ? `${libro.precio} €` : 'Sí'}{libro.estado_conservacion ? ` · ${libro.estado_conservacion}` : ''}</dd></>
               )}
             </dl>
           </div>
 
-          <div class="cuerpo-md">
-            <Content />
-          </div>
+          {notasHtml && <div class="cuerpo-md" set:html={notasHtml} />}
         </div>
       </div>
     </div>

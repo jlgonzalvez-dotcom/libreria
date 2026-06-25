@@ -1,26 +1,21 @@
 ---
-import { getCollection } from 'astro:content';
 import Layout from '../layouts/Layout.astro';
+import { listarLibros } from '../lib/libros';
 
-const libros = await getCollection('libros');
-
-// Orden: destacados primero, luego por título.
-libros.sort((a, b) => {
-  if (a.data.destacado !== b.data.destacado) return a.data.destacado ? -1 : 1;
-  return a.data.titulo.localeCompare(b.data.titulo, 'es');
-});
+// SSR: se lee de la base de datos en cada petición.
+const libros = await listarLibros();
 
 // Lista de categorías para los filtros.
-const categorias = [...new Set(libros.map((l) => l.data.categoria))].sort((a, b) =>
+const categorias = [...new Set(libros.map((l) => l.categoria))].sort((a, b) =>
   a.localeCompare(b, 'es'),
 );
 
 const total = libros.length;
-const leidos = libros.filter((l) => l.data.estado === 'leído').length;
+const leidos = libros.filter((l) => l.estado === 'leído').length;
 
 // Renderiza estrellas como texto (★ llenas / ☆ vacías).
-function estrellas(n?: number) {
-  if (n == null) return '';
+function estrellas(n?: number | null) {
+  if (n == null) return null;
   const llenas = '★'.repeat(Math.round(n));
   const vacias = '☆'.repeat(5 - Math.round(n));
   return { llenas, vacias };
@@ -58,53 +53,57 @@ function estrellas(n?: number) {
   </section>
 
   <section class="contenedor">
-    <div class="rejilla" id="rejilla">
-      {
-        libros.map((libro) => {
-          const d = libro.data;
-          const est = estrellas(d.valoracion);
-          const busqueda = `${d.titulo} ${d.autor} ${d.subcategorias.join(' ')} ${d.etiquetas.join(' ')}`.toLowerCase();
-          return (
-            <article class="libro" data-categoria={d.categoria} data-busqueda={busqueda}>
-              <a href={`/libros/${libro.id}/`}>
-                <div class="portada">
-                  {d.portada ? <img src={d.portada} alt={`Portada de ${d.titulo}`} /> : d.titulo.charAt(0)}
-                </div>
-                <div class="cuerpo">
-                  <div class="titulo">{d.titulo}</div>
-                  <div class="autor">{d.autor}</div>
-                  <div class="meta">
-                    <span class="badge cat">{d.categoria}</span>
-                    {est && (
-                      <span class="estrellas">
-                        {est.llenas}<span class="vacia">{est.vacias}</span>
-                      </span>
-                    )}
+    {
+      total === 0 ? (
+        <p class="vacio">Aún no hay libros en el catálogo. Añade el primero desde el <a href="/admin">panel de administración</a>.</p>
+      ) : (
+        <div class="rejilla" id="rejilla">
+          {libros.map((libro) => {
+            const est = estrellas(libro.valoracion);
+            const busqueda = `${libro.titulo} ${libro.autor} ${libro.subcategorias.join(' ')} ${libro.etiquetas.join(' ')}`.toLowerCase();
+            return (
+              <article class="libro" data-categoria={libro.categoria} data-busqueda={busqueda}>
+                <a href={`/libros/${libro.slug}/`}>
+                  <div class="portada">
+                    {libro.portada ? <img src={libro.portada} alt={`Portada de ${libro.titulo}`} /> : libro.titulo.charAt(0)}
                   </div>
-                  <div class="meta">
-                    <span class={`estado ${d.estado}`}>{d.estado}</span>
-                    {d.anio && <span class="badge">{d.anio}</span>}
+                  <div class="cuerpo">
+                    <div class="titulo">{libro.titulo}</div>
+                    <div class="autor">{libro.autor}</div>
+                    <div class="meta">
+                      <span class="badge cat">{libro.categoria}</span>
+                      {est && (
+                        <span class="estrellas">
+                          {est.llenas}<span class="vacia">{est.vacias}</span>
+                        </span>
+                      )}
+                    </div>
+                    <div class="meta">
+                      <span class={`estado ${libro.estado}`}>{libro.estado}</span>
+                      {libro.anio && <span class="badge">{libro.anio}</span>}
+                    </div>
                   </div>
-                </div>
-              </a>
-            </article>
-          );
-        })
-      }
-    </div>
+                </a>
+              </article>
+            );
+          })}
+        </div>
+      )
+    }
   </section>
 </Layout>
 
 <script>
-  const buscador = document.getElementById('buscador') as HTMLInputElement;
-  const chips = document.getElementById('chips')!;
-  const contador = document.getElementById('contador')!;
+  const buscador = document.getElementById('buscador') as HTMLInputElement | null;
+  const chips = document.getElementById('chips');
+  const contador = document.getElementById('contador');
   const tarjetas = Array.from(document.querySelectorAll<HTMLElement>('.libro'));
 
   let categoria = '*';
   let texto = '';
 
   function aplicar() {
+    if (!contador) return;
     let visibles = 0;
     for (const t of tarjetas) {
       const okCat = categoria === '*' || t.dataset.categoria === categoria;
@@ -116,7 +115,7 @@ function estrellas(n?: number) {
     contador.textContent = `${visibles} ${visibles === 1 ? 'libro' : 'libros'}`;
   }
 
-  chips.addEventListener('click', (e) => {
+  chips?.addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest('.chip') as HTMLElement | null;
     if (!btn) return;
     chips.querySelectorAll('.chip').forEach((c) => c.classList.remove('activo'));
@@ -125,7 +124,7 @@ function estrellas(n?: number) {
     aplicar();
   });
 
-  buscador.addEventListener('input', () => {
+  buscador?.addEventListener('input', () => {
     texto = buscador.value.trim().toLowerCase();
     aplicar();
   });

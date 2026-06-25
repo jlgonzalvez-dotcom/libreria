@@ -1,0 +1,49 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  titulo?: string;
+  mostrarNav?: boolean;
+}
+
+const { titulo = 'Admin — Mi Librería', mostrarNav = true } = Astro.props;
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{titulo}</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%93%9A%3C/text%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    {
+      mostrarNav && (
+        <header class="site-header">
+          <div class="contenedor">
+            <a href="/admin" class="logo">Mi <span>Librería</span> · admin</a>
+            <nav class="nav">
+              <a href="/" target="_blank">Ver catálogo ↗</a>
+              <a href="/admin/nuevo">+ Nuevo libro</a>
+              <form method="POST" action="/admin/logout" class="logout-form">
+                <button type="submit" class="link-btn">Cerrar sesión</button>
+              </form>
+            </nav>
+          </div>
+        </header>
+      )
+    }
+
+    <main>
+      <slot />
+    </main>
+  </body>
+</html>
