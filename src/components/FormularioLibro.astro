@@ -60,6 +60,7 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
       <div class="autocompletar-fila">
         <input id="isbn" name="isbn" type="text" value={v.isbn} placeholder="978… o título del libro" />
         <button type="button" id="btn-autocompletar" class="btn-secundario">Buscar datos</button>
+        <button type="button" id="btn-escanear" class="btn-secundario" title="Escanear el código de barras con la cámara">📷 Escanear</button>
       </div>
       <small id="autocompletar-msg" class="ayuda"></small>
     </div>
@@ -179,9 +180,13 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
           <span id="portada-placeholder" class="portada-placeholder" style={v.portada ? 'display:none' : ''}>Sin portada</span>
         </div>
         <div class="portada-controles">
-          <input type="file" id="portada-file" accept="image/*" hidden />
-          <label for="portada-file" class="btn-secundario portada-btn">Subir imagen…</label>
-          <small class="ayuda">Sube una foto (JPG/PNG/WebP, máx. 5 MB), pega una URL, o usa "Buscar datos" por ISBN.</small>
+          <div class="portada-botones">
+            <input type="file" id="portada-file" accept="image/*" hidden />
+            <label for="portada-file" class="btn-secundario portada-btn">Subir imagen…</label>
+            <input type="file" id="ocr-file" accept="image/*" capture="environment" hidden />
+            <label for="ocr-file" class="btn-secundario portada-btn">🔤 Identificar por foto</label>
+          </div>
+          <small class="ayuda">Sube una foto (JPG/PNG/WebP, máx. 5 MB), pega una URL, o usa "Buscar datos" por ISBN. Con "Identificar por foto" haz una foto de la portada y se lee el título en tu dispositivo (gratis).</small>
           <input id="portada" name="portada" type="text" value={v.portada} placeholder="https://… (URL de la portada)" />
           <small id="portada-msg" class="ayuda"></small>
         </div>
@@ -231,6 +236,15 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
     <a href="/admin" class="btn-secundario">Cancelar</a>
   </div>
 </form>
+
+<div id="escaner-modal" class="escaner-modal" hidden>
+  <div class="escaner-caja">
+    <p class="escaner-titulo">Apunta al código de barras del libro</p>
+    <video id="escaner-video" class="escaner-video" muted playsinline></video>
+    <p id="escaner-msg" class="ayuda"></p>
+    <button type="button" id="escaner-cerrar" class="btn-secundario">Cancelar</button>
+  </div>
+</div>
 
 <script>
   const $ = (id: string) => document.getElementById(id);
@@ -308,13 +322,27 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
     if (el && !el.value) el.value = String(valor);
   }
 
-  btn?.addEventListener('click', async () => {
+  // Rellena el formulario desde un resultado (autocompletar o IA).
+  function aplicarResultado(data: any) {
+    set('titulo', data.titulo);
+    set('autor', data.autor);
+    set('autores_extra', (data.autores_extra ?? []).join(', '));
+    set('anio', data.anio);
+    set('editorial', data.editorial);
+    set('paginas', data.paginas);
+    set('portada', data.portada);
+    set('sinopsis', data.sinopsis);
+    if (data.isbn && isbnInput && !isbnInput.value) isbnInput.value = data.isbn;
+    if (portadaInput) actualizarPreview(portadaInput.value.trim());
+  }
+
+  async function autocompletar() {
     const consulta = isbnInput?.value.trim();
     if (!consulta) {
       if (msg) msg.textContent = 'Escribe un ISBN o un título primero.';
       return;
     }
-    btn.disabled = true;
+    if (btn) btn.disabled = true;
     if (msg) msg.textContent = 'Buscando…';
     try {
       const res = await fetch(`/api/autocompletar?q=${encodeURIComponent(consulta)}`);
@@ -323,21 +351,143 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
         if (msg) msg.textContent = 'No se encontraron datos. Rellénalo a mano.';
         return;
       }
-      set('titulo', data.titulo);
-      set('autor', data.autor);
-      set('autores_extra', (data.autores_extra ?? []).join(', '));
-      set('anio', data.anio);
-      set('editorial', data.editorial);
-      set('paginas', data.paginas);
-      set('portada', data.portada);
-      set('sinopsis', data.sinopsis);
-      if (data.isbn && isbnInput) isbnInput.value = data.isbn;
-      if (portadaInput) actualizarPreview(portadaInput.value.trim());
+      aplicarResultado(data);
       if (msg) msg.textContent = `Datos de ${data.fuente}. Revisa y completa lo que falte.`;
     } catch {
       if (msg) msg.textContent = 'Error al buscar. Inténtalo de nuevo.';
     } finally {
-      btn.disabled = false;
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  btn?.addEventListener('click', autocompletar);
+
+  // ── Escáner de código de barras (cámara, ZXing) ────────────────────────────
+  const btnEscanear = $('btn-escanear') as HTMLButtonElement | null;
+  const modal = $('escaner-modal');
+  const video = $('escaner-video') as HTMLVideoElement | null;
+  const escMsg = $('escaner-msg');
+  let escControls: { stop: () => void } | null = null;
+
+  function cerrarEscaner() {
+    if (escControls) {
+      try { escControls.stop(); } catch { /* noop */ }
+      escControls = null;
+    }
+    if (modal) modal.hidden = true;
+  }
+
+  $('escaner-cerrar')?.addEventListener('click', cerrarEscaner);
+
+  btnEscanear?.addEventListener('click', async () => {
+    if (!modal || !video) return;
+    modal.hidden = false;
+    if (escMsg) escMsg.textContent = 'Iniciando cámara…';
+    try {
+      const { BrowserMultiFormatReader } = await import('@zxing/browser');
+      const reader = new BrowserMultiFormatReader();
+      escControls = await reader.decodeFromConstraints(
+        { video: { facingMode: 'environment' } },
+        video,
+        (result, _err, controls) => {
+          if (!result) return;
+          controls.stop();
+          escControls = null;
+          if (modal) modal.hidden = true;
+          if (isbnInput) isbnInput.value = result.getText();
+          autocompletar();
+        },
+      );
+      if (escMsg) escMsg.textContent = 'Enfoca el código de barras (ISBN) de la contraportada.';
+    } catch {
+      if (escMsg) escMsg.textContent = 'No se pudo abrir la cámara. Permite el acceso o escribe el ISBN a mano.';
+    }
+  });
+
+  // ── Identificar por foto (OCR local con Tesseract.js) ──────────────────────
+  const ocrFile = $('ocr-file') as HTMLInputElement | null;
+
+  async function subirComoPortada(file: File) {
+    const fd = new FormData();
+    fd.append('imagen', file);
+    try {
+      const res = await fetch('/admin/subir-portada', { method: 'POST', body: fd });
+      const d = await res.json();
+      if (res.ok && d.url && portadaInput) {
+        portadaInput.value = d.url;
+        actualizarPreview(d.url);
+      }
+    } catch { /* la portada es opcional */ }
+  }
+
+  async function buscarPorTexto(q: string): Promise<any | null> {
+    try {
+      const res = await fetch(`/api/autocompletar?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      return res.ok && data.encontrado ? data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  ocrFile?.addEventListener('change', async () => {
+    const file = ocrFile.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      if (portadaMsg) portadaMsg.textContent = 'La imagen supera los 5 MB.';
+      ocrFile.value = '';
+      return;
+    }
+    if (portadaMsg) portadaMsg.textContent = 'Preparando el lector de texto…';
+    try {
+      const Tesseract = (await import('tesseract.js')).default;
+      const { data } = await Tesseract.recognize(file, 'spa+eng', {
+        logger: (m: any) => {
+          if (m.status === 'recognizing text' && portadaMsg) {
+            portadaMsg.textContent = `Leyendo la portada… ${Math.round((m.progress ?? 0) * 100)}%`;
+          }
+        },
+      });
+
+      // Líneas legibles, de la más larga a la más corta (la más larga suele ser el título).
+      const lineas = (data.text || '')
+        .split('\n')
+        .map((s) => s.trim())
+        .filter((s) => s.replace(/[^\p{L}]/gu, '').length >= 4)
+        .sort((a, b) => b.length - a.length);
+
+      if (lineas.length === 0) {
+        if (portadaMsg) portadaMsg.textContent = 'No se pudo leer texto. Prueba con más luz, o escribe el título a mano.';
+        await subirComoPortada(file);
+        return;
+      }
+
+      // Probar varias consultas a partir del texto leído.
+      const intentos = [lineas[0], lineas[1] ? `${lineas[0]} ${lineas[1]}` : '', lineas[1] ?? '']
+        .filter((q, i, a) => q !== '' && a.indexOf(q) === i);
+
+      if (portadaMsg) portadaMsg.textContent = 'Buscando el libro…';
+      let encontrado: any = null;
+      for (const q of intentos) {
+        encontrado = await buscarPorTexto(q);
+        if (encontrado) break;
+      }
+
+      if (encontrado) {
+        aplicarResultado(encontrado);
+        if (!encontrado.portada && portadaInput && !portadaInput.value) await subirComoPortada(file);
+        if (portadaMsg) portadaMsg.textContent = `Datos de ${encontrado.fuente} (texto leído de la foto). Revísalos.`;
+      } else {
+        // Sin coincidencia: al menos dejamos el texto leído en el título y la foto como portada.
+        const tituloEl = $('titulo') as HTMLInputElement | null;
+        if (tituloEl && !tituloEl.value) tituloEl.value = lineas[0];
+        await subirComoPortada(file);
+        if (portadaMsg) portadaMsg.textContent = 'No encontré el libro; he puesto el texto leído en el título y tu foto como portada.';
+      }
+    } catch {
+      if (portadaMsg) portadaMsg.textContent = 'No se pudo leer la imagen. Inténtalo de nuevo.';
+    } finally {
+      ocrFile.value = '';
     }
   });
 </script>

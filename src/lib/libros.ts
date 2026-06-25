@@ -73,7 +73,11 @@ export async function obtenerLibroPorSlug(slug: string): Promise<Libro | null> {
   return data;
 }
 
+const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function obtenerLibroPorId(id: string): Promise<Libro | null> {
+  // Si el id no es un UUID (p. ej. una ruta /admin/loquesea), no consultamos.
+  if (!RE_UUID.test(id)) return null;
   const { data, error } = await supabase
     .from('libros')
     .select('*')

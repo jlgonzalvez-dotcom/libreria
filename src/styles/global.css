@@ -346,7 +346,26 @@ a:hover { text-decoration: underline; }
 .portada-preview img { width: 100%; height: 100%; object-fit: cover; }
 .portada-placeholder { color: var(--tinta-suave); font-size: 0.8rem; text-align: center; padding: 8px; }
 .portada-controles { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.portada-btn { align-self: flex-start; cursor: pointer; }
+.portada-botones { display: flex; flex-wrap: wrap; gap: 8px; }
+.portada-btn { cursor: pointer; }
+
+/* Escáner de código de barras (modal con cámara) */
+.escaner-modal {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(43, 37, 32, 0.75);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.escaner-modal[hidden] { display: none; }
+.escaner-caja {
+  background: var(--papel); border-radius: var(--radio); padding: 20px;
+  width: 100%; max-width: 420px; text-align: center; box-shadow: var(--sombra);
+}
+.escaner-titulo { font-family: var(--serif); font-weight: 600; margin: 0 0 12px; }
+.escaner-video {
+  width: 100%; aspect-ratio: 4 / 3; background: #000;
+  border-radius: var(--radio); object-fit: cover;
+}
+.escaner-caja .ayuda { display: block; margin: 10px 0 14px; min-height: 1em; }
 
 @media (max-width: 640px) {
   .detalle .grid { grid-template-columns: 1fr; }
