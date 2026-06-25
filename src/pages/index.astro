@@ -1,0 +1,132 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../layouts/Layout.astro';
+
+const libros = await getCollection('libros');
+
+// Orden: destacados primero, luego por título.
+libros.sort((a, b) => {
+  if (a.data.destacado !== b.data.destacado) return a.data.destacado ? -1 : 1;
+  return a.data.titulo.localeCompare(b.data.titulo, 'es');
+});
+
+// Lista de categorías para los filtros.
+const categorias = [...new Set(libros.map((l) => l.data.categoria))].sort((a, b) =>
+  a.localeCompare(b, 'es'),
+);
+
+const total = libros.length;
+const leidos = libros.filter((l) => l.data.estado === 'leído').length;
+
+// Renderiza estrellas como texto (★ llenas / ☆ vacías).
+function estrellas(n?: number) {
+  if (n == null) return '';
+  const llenas = '★'.repeat(Math.round(n));
+  const vacias = '☆'.repeat(5 - Math.round(n));
+  return { llenas, vacias };
+}
+---
+
+<Layout titulo="Mi Librería — Catálogo" descripcion="Catálogo de mi biblioteca personal, clasificado por categorías.">
+  <section class="hero">
+    <div class="contenedor">
+      <h1>Mi biblioteca personal</h1>
+      <p>Todos mis libros, bien clasificados y a un clic. Busca por título o autor, o filtra por categoría.</p>
+      <div class="stats">
+        <div class="stat"><strong>{total}</strong><span>Libros</span></div>
+        <div class="stat"><strong>{categorias.length}</strong><span>Categorías</span></div>
+        <div class="stat"><strong>{leidos}</strong><span>Leídos</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="controles">
+    <div class="contenedor">
+      <input
+        id="buscador"
+        class="buscador"
+        type="search"
+        placeholder="Buscar por título, autor o etiqueta…"
+        autocomplete="off"
+      />
+      <div class="chips" id="chips">
+        <button class="chip activo" data-cat="*">Todas</button>
+        {categorias.map((c) => <button class="chip" data-cat={c}>{c}</button>)}
+      </div>
+      <p class="contador" id="contador">{total} libros</p>
+    </div>
+  </section>
+
+  <section class="contenedor">
+    <div class="rejilla" id="rejilla">
+      {
+        libros.map((libro) => {
+          const d = libro.data;
+          const est = estrellas(d.valoracion);
+          const busqueda = `${d.titulo} ${d.autor} ${d.subcategorias.join(' ')} ${d.etiquetas.join(' ')}`.toLowerCase();
+          return (
+            <article class="libro" data-categoria={d.categoria} data-busqueda={busqueda}>
+              <a href={`/libros/${libro.id}/`}>
+                <div class="portada">
+                  {d.portada ? <img src={d.portada} alt={`Portada de ${d.titulo}`} /> : d.titulo.charAt(0)}
+                </div>
+                <div class="cuerpo">
+                  <div class="titulo">{d.titulo}</div>
+                  <div class="autor">{d.autor}</div>
+                  <div class="meta">
+                    <span class="badge cat">{d.categoria}</span>
+                    {est && (
+                      <span class="estrellas">
+                        {est.llenas}<span class="vacia">{est.vacias}</span>
+                      </span>
+                    )}
+                  </div>
+                  <div class="meta">
+                    <span class={`estado ${d.estado}`}>{d.estado}</span>
+                    {d.anio && <span class="badge">{d.anio}</span>}
+                  </div>
+                </div>
+              </a>
+            </article>
+          );
+        })
+      }
+    </div>
+  </section>
+</Layout>
+
+<script>
+  const buscador = document.getElementById('buscador') as HTMLInputElement;
+  const chips = document.getElementById('chips')!;
+  const contador = document.getElementById('contador')!;
+  const tarjetas = Array.from(document.querySelectorAll<HTMLElement>('.libro'));
+
+  let categoria = '*';
+  let texto = '';
+
+  function aplicar() {
+    let visibles = 0;
+    for (const t of tarjetas) {
+      const okCat = categoria === '*' || t.dataset.categoria === categoria;
+      const okTxt = texto === '' || (t.dataset.busqueda ?? '').includes(texto);
+      const mostrar = okCat && okTxt;
+      t.style.display = mostrar ? '' : 'none';
+      if (mostrar) visibles++;
+    }
+    contador.textContent = `${visibles} ${visibles === 1 ? 'libro' : 'libros'}`;
+  }
+
+  chips.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('.chip') as HTMLElement | null;
+    if (!btn) return;
+    chips.querySelectorAll('.chip').forEach((c) => c.classList.remove('activo'));
+    btn.classList.add('activo');
+    categoria = btn.dataset.cat ?? '*';
+    aplicar();
+  });
+
+  buscador.addEventListener('input', () => {
+    texto = buscador.value.trim().toLowerCase();
+    aplicar();
+  });
+</script>
