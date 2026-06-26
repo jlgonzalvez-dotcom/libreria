@@ -160,6 +160,36 @@ a:hover { color: var(--acento-osc); }
 .hero-featured-info strong { display: block; font-family: var(--serif); font-size: 1.18rem; font-weight: 600; line-height: 1.2; }
 .hero-featured-info em { color: var(--tinta-suave); font-size: 0.92rem; }
 
+/* Rejilla de libros de 5★ en el hero (rota al azar en cada carga) */
+.hero-estrellas { justify-self: center; width: min(380px, 88vw); text-align: center; }
+.hero-rejilla { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px 20px; }
+.hero-rejilla.n-1 { grid-template-columns: 1fr; width: 60%; margin-inline: auto; }
+.hero-rejilla.n-3 { grid-template-columns: repeat(3, 1fr); gap: 18px 14px; }
+.hero-mini { display: block; color: inherit; }
+.hero-mini:hover { color: inherit; }
+.hero-mini-cover {
+  aspect-ratio: 3 / 4;
+  border-radius: 5px;
+  overflow: hidden;
+  background: linear-gradient(150deg, var(--acento) 0%, var(--acento-claro) 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255, 255, 255, 0.92); font-family: var(--serif); font-size: 2.2rem;
+  box-shadow: -8px 14px 28px rgba(43, 37, 32, 0.26);
+  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 0.3s ease;
+  position: relative;
+}
+.hero-mini-cover::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 9px; background: linear-gradient(90deg, rgba(0, 0, 0, 0.24), rgba(0, 0, 0, 0)); }
+.hero-mini:hover .hero-mini-cover { transform: translateY(-5px); box-shadow: -6px 20px 36px rgba(43, 37, 32, 0.32); }
+.hero-mini-cover img { width: 100%; height: 100%; object-fit: cover; }
+.hero-mini-info { margin-top: 10px; }
+.hero-mini-info strong {
+  font-family: var(--serif); font-size: 0.9rem; font-weight: 600; line-height: 1.18;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.hero-mini-info em { display: block; color: var(--tinta-suave); font-size: 0.76rem; margin-top: 2px; }
+.hero-estrellas-label { display: inline-block; margin-top: 24px; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.16em; font-weight: 600; color: var(--tinta-tenue); }
+.hero-estrellas-label .estrellas-oro { color: var(--oro); letter-spacing: 0.05em; margin-right: 4px; }
+
 /* ── Sección: cabecera ────────────────────────────────────────────────────── */
 .catalogo { padding-top: 48px; }
 .seccion-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--linea); padding-bottom: 14px; margin-bottom: 24px; }
@@ -529,6 +559,7 @@ a:hover { color: var(--acento-osc); }
   }
   .hero-featured { order: -1; width: min(200px, 56vw); }
   .hero-featured .hero-featured-info { display: none; }
+  .hero-estrellas { order: -1; width: min(360px, 84vw); }
 }
 
 @media (max-width: 720px) {

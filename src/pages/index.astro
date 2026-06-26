@@ -12,8 +12,20 @@ const categorias = [...new Set(libros.map((l) => l.categoria))].sort((a, b) =>
 const total = libros.length;
 const leidos = libros.filter((l) => l.estado === 'leído').length;
 
-// Libro destacado para el hero: el marcado como destacado, o el primero.
-const destacado = libros.find((l) => l.destacado) ?? libros[0] ?? null;
+// Destacados del hero: los libros de 5 estrellas. Si hay muchos, se barajan y
+// se muestran como máximo MAX_DESTACADOS, rotando en cada carga (SSR → cada
+// visita ejecuta esto de nuevo, así que el orden cambia al recargar).
+const MAX_DESTACADOS = 4;
+const cincoEstrellas = libros.filter((l) => Number(l.valoracion) === 5);
+for (let i = cincoEstrellas.length - 1; i > 0; i--) {
+  const j = Math.floor(Math.random() * (i + 1)); // barajado Fisher–Yates
+  [cincoEstrellas[i], cincoEstrellas[j]] = [cincoEstrellas[j], cincoEstrellas[i]];
+}
+const destacados = cincoEstrellas.slice(0, MAX_DESTACADOS);
+
+// Si aún no hay ningún libro de 5★, no dejamos el hero vacío: caemos al
+// comportamiento anterior (el marcado como destacado, o el primero).
+const fallback = destacados.length === 0 ? (libros.find((l) => l.destacado) ?? libros[0] ?? null) : null;
 
 function estrellas(n?: number | null) {
   if (n == null) return null;
@@ -37,21 +49,44 @@ function estrellas(n?: number | null) {
       </div>
 
       {
-        destacado && (
-          <a class="hero-featured" href={`/libros/${destacado.slug}/`}>
-            <span class="hero-featured-label">Destacado</span>
-            <div class="hero-cover">
-              {destacado.portada ? (
-                <img src={destacado.portada} alt={`Portada de ${destacado.titulo}`} />
-              ) : (
-                <span>{destacado.titulo.charAt(0)}</span>
-              )}
+        destacados.length > 0 ? (
+          <div class="hero-estrellas">
+            <div class={`hero-rejilla n-${destacados.length}`}>
+              {destacados.map((libro) => (
+                <a class="hero-mini" href={`/libros/${libro.slug}/`} title={`${libro.titulo} — ${libro.autor}`}>
+                  <div class="hero-mini-cover">
+                    {libro.portada ? (
+                      <img src={libro.portada} alt={`Portada de ${libro.titulo}`} loading="lazy" />
+                    ) : (
+                      <span>{libro.titulo.charAt(0)}</span>
+                    )}
+                  </div>
+                  <div class="hero-mini-info">
+                    <strong>{libro.titulo}</strong>
+                    <em>{libro.autor}</em>
+                  </div>
+                </a>
+              ))}
             </div>
-            <div class="hero-featured-info">
-              <strong>{destacado.titulo}</strong>
-              <em>{destacado.autor}</em>
-            </div>
-          </a>
+            <span class="hero-estrellas-label"><span class="estrellas-oro">★★★★★</span> Cinco estrellas</span>
+          </div>
+        ) : (
+          fallback && (
+            <a class="hero-featured" href={`/libros/${fallback.slug}/`}>
+              <span class="hero-featured-label">Destacado</span>
+              <div class="hero-cover">
+                {fallback.portada ? (
+                  <img src={fallback.portada} alt={`Portada de ${fallback.titulo}`} />
+                ) : (
+                  <span>{fallback.titulo.charAt(0)}</span>
+                )}
+              </div>
+              <div class="hero-featured-info">
+                <strong>{fallback.titulo}</strong>
+                <em>{fallback.autor}</em>
+              </div>
+            </a>
+          )
         )
       }
     </div>
