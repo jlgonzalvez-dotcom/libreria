@@ -14,9 +14,10 @@ export const ESTADOS_CONSERVACION = ['nuevo', 'como nuevo', 'bueno', 'aceptable'
 
 // Categorías sugeridas (el campo admite también escribir una nueva, vía datalist).
 export const CATEGORIAS_SUGERIDAS = [
-  'Narrativa', 'Ensayo', 'Ciencia', 'Clásicos', 'Medicina', 'Historia',
-  'Poesía', 'Teatro', 'Filosofía', 'Arte', 'Infantil', 'Cómic',
+  'Narrativa', 'Novela histórica', 'Ensayo', 'Ciencia', 'Clásicos', 'Medicina',
+  'Historia', 'Poesía', 'Teatro', 'Filosofía', 'Arte', 'Infantil', 'Cómic',
   'Tecnología', 'Autoayuda', 'Biografía', 'Religión', 'Derecho', 'Economía',
+  'Ajedrez',
 ];
 
 export const IDIOMAS = [

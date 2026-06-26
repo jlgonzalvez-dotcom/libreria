@@ -43,9 +43,13 @@ const v = {
   resena: libro?.resena ?? '',
 };
 
-const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes])].sort((a, b) =>
-  a.localeCompare(b, 'es'),
-);
+const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes])]
+  .filter((c) => c && c.trim() !== '')
+  .sort((a, b) => a.localeCompare(b, 'es'));
+
+// ¿La categoría guardada NO está entre las opciones? Entonces es "personalizada"
+// y arrancamos mostrando el campo de texto libre (opción "Otra…").
+const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.categoria);
 ---
 
 <form method="POST" action="/admin/guardar" class="form-libro">
@@ -87,11 +91,22 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
 
     <div class="fila-2">
       <div class="campo">
-        <label for="categoria">Categoría <small class="ayuda">(opcional)</small></label>
-        <input id="categoria" name="categoria" type="text" value={v.categoria} list="lista-categorias" placeholder="si la dejas vacía: Sin categoría" />
-        <datalist id="lista-categorias">
-          {categorias.map((c) => <option value={c} />)}
-        </datalist>
+        <label for="categoria-select">Categoría <small class="ayuda">(opcional)</small></label>
+        <select id="categoria-select">
+          <option value="" selected={v.categoria === ''}>Sin categoría</option>
+          {categorias.map((c) => (
+            <option value={c} selected={!categoriaPersonalizada && c === v.categoria}>{c}</option>
+          ))}
+          <option value="__otra__" selected={categoriaPersonalizada}>✏️ Otra categoría…</option>
+        </select>
+        <input
+          id="categoria-otra"
+          type="text"
+          value={categoriaPersonalizada ? v.categoria : ''}
+          placeholder="Escribe una categoría nueva"
+          style={`margin-top:.5rem${categoriaPersonalizada ? '' : ';display:none'}`}
+        />
+        <input type="hidden" id="categoria" name="categoria" value={v.categoria} />
       </div>
       <div class="campo">
         <label for="subcategorias">Subcategorías / géneros</label>
@@ -560,5 +575,33 @@ const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...categoriasExistentes
     } finally {
       ocrFile.value = '';
     }
+  });
+
+  // ── Categoría: desplegable real + opción "Otra…" para escribir una nueva ───
+  // El <select> siempre se abre y muestra todas las categorías (a diferencia del
+  // datalist anterior, que se "cerraba" cuando el campo ya tenía un valor). El
+  // valor que se envía vive en el input oculto #categoria.
+  const catSelect = $('categoria-select') as HTMLSelectElement | null;
+  const catOtra = $('categoria-otra') as HTMLInputElement | null;
+  const catHidden = $('categoria') as HTMLInputElement | null;
+
+  function sincronizarCategoria() {
+    if (!catSelect || !catOtra || !catHidden) return;
+    if (catSelect.value === '__otra__') {
+      catOtra.style.display = '';
+      catHidden.value = catOtra.value.trim();
+    } else {
+      catOtra.style.display = 'none';
+      catHidden.value = catSelect.value;
+    }
+  }
+
+  catSelect?.addEventListener('change', () => {
+    const abrirTexto = catSelect.value === '__otra__';
+    sincronizarCategoria();
+    if (abrirTexto) catOtra?.focus();
+  });
+  catOtra?.addEventListener('input', () => {
+    if (catHidden) catHidden.value = catOtra.value.trim();
   });
 </script>
