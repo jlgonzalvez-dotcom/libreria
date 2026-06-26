@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { crearLibro, actualizarLibro, generarSlugUnico } from '../../lib/libros';
+import { esIsbn } from '../../lib/biblio';
 
 // ── Helpers de parseo del formulario ─────────────────────────────────────────
 function lista(valor: FormDataEntryValue | null): string[] {
@@ -45,7 +46,8 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     anio: numero(datos.get('anio')),
     idioma: texto(datos.get('idioma')) ?? 'Español',
     editorial: texto(datos.get('editorial')),
-    isbn: texto(datos.get('isbn')),
+    // El cuadro "ISBN o título" solo se guarda como ISBN si lo es de verdad.
+    isbn: esIsbn(String(datos.get('isbn') ?? '').trim()),
     paginas: numero(datos.get('paginas')),
     estado: String(datos.get('estado') ?? 'pendiente'),
     valoracion: numero(datos.get('valoracion')),

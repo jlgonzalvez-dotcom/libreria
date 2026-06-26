@@ -5,7 +5,6 @@ import { listarLibros } from '../lib/libros';
 // SSR: se lee de la base de datos en cada petición.
 const libros = await listarLibros();
 
-// Lista de categorías para los filtros.
 const categorias = [...new Set(libros.map((l) => l.categoria))].sort((a, b) =>
   a.localeCompare(b, 'es'),
 );
@@ -13,7 +12,9 @@ const categorias = [...new Set(libros.map((l) => l.categoria))].sort((a, b) =>
 const total = libros.length;
 const leidos = libros.filter((l) => l.estado === 'leído').length;
 
-// Renderiza estrellas como texto (★ llenas / ☆ vacías).
+// Libro destacado para el hero: el marcado como destacado, o el primero.
+const destacado = libros.find((l) => l.destacado) ?? libros[0] ?? null;
+
 function estrellas(n?: number | null) {
   if (n == null) return null;
   const llenas = '★'.repeat(Math.round(n));
@@ -22,21 +23,47 @@ function estrellas(n?: number | null) {
 }
 ---
 
-<Layout titulo="Mi Librería — Catálogo" descripcion="Catálogo de mi biblioteca personal, clasificado por categorías.">
+<Layout titulo="La librería de JL — Catálogo" descripcion="Catálogo de mi colección de libros, clasificado por categorías.">
   <section class="hero">
-    <div class="contenedor">
-      <h1>Mi biblioteca personal</h1>
-      <p>Todos mis libros, bien clasificados y a un clic. Busca por título o autor, o filtra por categoría.</p>
-      <div class="stats">
-        <div class="stat"><strong>{total}</strong><span>Libros</span></div>
-        <div class="stat"><strong>{categorias.length}</strong><span>Categorías</span></div>
-        <div class="stat"><strong>{leidos}</strong><span>Leídos</span></div>
+    <div class="contenedor hero-inner">
+      <div class="hero-texto">
+        <h1>Una colección<br />cuidada, libro a libro.</h1>
+        <p class="hero-lead">Busca por título o autor, o explora la colección por categoría.</p>
+        <div class="stats">
+          <div class="stat"><strong>{total}</strong><span>Libros</span></div>
+          <div class="stat"><strong>{categorias.length}</strong><span>Categorías</span></div>
+          <div class="stat"><strong>{leidos}</strong><span>Leídos</span></div>
+        </div>
       </div>
+
+      {
+        destacado && (
+          <a class="hero-featured" href={`/libros/${destacado.slug}/`}>
+            <span class="hero-featured-label">Destacado</span>
+            <div class="hero-cover">
+              {destacado.portada ? (
+                <img src={destacado.portada} alt={`Portada de ${destacado.titulo}`} />
+              ) : (
+                <span>{destacado.titulo.charAt(0)}</span>
+              )}
+            </div>
+            <div class="hero-featured-info">
+              <strong>{destacado.titulo}</strong>
+              <em>{destacado.autor}</em>
+            </div>
+          </a>
+        )
+      }
     </div>
   </section>
 
-  <section class="controles">
-    <div class="contenedor">
+  <section class="contenedor catalogo">
+    <div class="seccion-cab">
+      <h2>El catálogo</h2>
+      <p class="contador" id="contador">{total} {total === 1 ? 'libro' : 'libros'}</p>
+    </div>
+
+    <div class="controles-bar">
       <input
         id="buscador"
         class="buscador"
@@ -48,11 +75,8 @@ function estrellas(n?: number | null) {
         <button class="chip activo" data-cat="*">Todas</button>
         {categorias.map((c) => <button class="chip" data-cat={c}>{c}</button>)}
       </div>
-      <p class="contador" id="contador">{total} libros</p>
     </div>
-  </section>
 
-  <section class="contenedor">
     {
       total === 0 ? (
         <p class="vacio">Aún no hay libros en el catálogo. Añade el primero desde el <a href="/admin">panel de administración</a>.</p>
@@ -66,6 +90,7 @@ function estrellas(n?: number | null) {
                 <a href={`/libros/${libro.slug}/`}>
                   <div class="portada">
                     {libro.portada ? <img src={libro.portada} alt={`Portada de ${libro.titulo}`} /> : libro.titulo.charAt(0)}
+                    {libro.destacado && <span class="cinta">Destacado</span>}
                   </div>
                   <div class="cuerpo">
                     <div class="titulo">{libro.titulo}</div>

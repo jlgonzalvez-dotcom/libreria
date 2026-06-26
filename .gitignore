@@ -3,6 +3,9 @@ dist/
 .vercel/
 .netlify/
 
+# datos de idioma de Tesseract (se cargan del CDN, no van al repo)
+*.traineddata
+
 # generated types y cachés de Astro
 .astro/
 

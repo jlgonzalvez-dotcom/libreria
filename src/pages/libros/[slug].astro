@@ -20,7 +20,7 @@ const autores = [libro.autor, ...libro.autores_extra].join(', ');
 const notasHtml = libro.notas ? marked.parse(libro.notas) : '';
 ---
 
-<Layout titulo={`${libro.titulo} — Mi Librería`} descripcion={libro.sinopsis ?? libro.titulo}>
+<Layout titulo={`${libro.titulo} — La librería de JL`} descripcion={libro.sinopsis ?? libro.titulo}>
   <section class="detalle">
     <div class="contenedor">
       <a class="volver" href="/">← Volver al catálogo</a>
