@@ -1,5 +1,9 @@
-// Búsqueda de datos bibliográficos en fuentes gratuitas (Open Library + Google
-// Books). Lo usan el autocompletado por ISBN/título y el OCR de portadas.
+// Búsqueda de datos bibliográficos en fuentes gratuitas y sin clave:
+//  · Por ISBN: Google Books + Open Library + BNE (Biblioteca Nacional de España).
+//  · Por título: Google Books + Open Library.
+// La BNE cubre prácticamente todo lo publicado en España (incluido libro antiguo
+// y agotado) que suele faltar en Google Books y Open Library.
+// Lo usan el autocompletado por ISBN/título y el OCR de portadas.
 // Nota: NO mandar User-Agent propio — la CDN de Open Library corta la conexión
 // con cabeceras de cliente personalizadas desde el servidor (fetch failed).
 
@@ -106,6 +110,110 @@ async function openLibraryIsbn(isbn: string): Promise<DatosLibro | null> {
   };
 }
 
+// ── Biblioteca Nacional de España (SRU, Dublin Core) ────────────────────────
+const BNE_SRU = 'https://catalogo.bne.es/view/sru/34BNE_INST';
+
+function desescaparXml(s: string): string {
+  return s
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, '&');
+}
+
+/** Texto de todas las etiquetas <dc:tag> del XML (se pide maximumRecords=1). */
+function extraerDc(xml: string, tag: string): string[] {
+  const re = new RegExp(`<dc:${tag}>([\\s\\S]*?)</dc:${tag}>`, 'g');
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(xml)) !== null) {
+    const txt = desescaparXml(m[1]).replace(/\s+/g, ' ').trim();
+    if (txt) out.push(txt);
+  }
+  return out;
+}
+
+// Roles de la BNE que NO son el autor principal (traductor, editor, ilustrador…).
+const ROL_SECUNDARIO = /\s(trad|il|ed|dir|comp|coord|pr|ant|rev|col|pref|introd)\.?$/i;
+
+/** "Ruiz Zafón, Carlos 1964-2020 aut" → "Carlos Ruiz Zafón". */
+function limpiarPersonaBne(s: string): string {
+  let t = s
+    .replace(/\b\d{4}(-\d{0,4})?\b/g, ' ') // fechas de nacimiento/muerte
+    .replace(/\s(aut|trad|il|ed|dir|comp|coord|pr|ant|rev|col|pref|introd)\.?\s*$/i, '') // rol
+    .replace(/\s{2,}/g, ' ')
+    .replace(/[.,;\s]+$/, '')
+    .trim();
+  const c = t.indexOf(',');
+  if (c > 0) {
+    const apellidos = t.slice(0, c).trim();
+    const nombre = t.slice(c + 1).trim();
+    if (nombre) t = `${nombre} ${apellidos}`;
+  }
+  return t.trim();
+}
+
+/** Quita el descriptor de soporte del título ("[Texto impreso]", etc.). */
+function quitarSoporteBne(titulo: string): string {
+  return titulo.replace(/\s*\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim();
+}
+
+const LUGARES_BNE = new Set([
+  'madrid', 'barcelona', 'valencia', 'sevilla', 'zaragoza', 'málaga', 'bilbao',
+  'pamplona', 'salamanca', 'granada', 'oviedo', 'santander', 'méxico', 'buenos aires',
+  's.l.', '[s.l.]',
+]);
+
+/** De los varios dc:publisher (lugar + editoriales) elige la editorial. */
+function editorialBne(publishers: string[]): string | null {
+  const limpios = publishers.map((p) => p.replace(/[.,;:\s]+$/, '').trim()).filter(Boolean);
+  const real = limpios.find((p) => !LUGARES_BNE.has(p.toLowerCase()));
+  return real ?? limpios[0] ?? null;
+}
+
+async function bneIsbn(isbn: string): Promise<DatosLibro | null> {
+  const query = encodeURIComponent(`alma.isbn=${isbn}`);
+  const url = `${BNE_SRU}?operation=searchRetrieve&version=1.2&query=${query}&recordSchema=dc&maximumRecords=1`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const xml = await res.text();
+  const titulos = extraerDc(xml, 'title');
+  if (titulos.length === 0) return null;
+  const personas = [...extraerDc(xml, 'creator'), ...extraerDc(xml, 'contributor')];
+  const autores = personas
+    .filter((p) => !ROL_SECUNDARIO.test(p)) // descartar traductores/editores/…
+    .map(limpiarPersonaBne)
+    .filter(Boolean);
+  return {
+    encontrado: true,
+    fuente: 'BNE',
+    titulo: quitarSoporteBne(titulos[0]),
+    autor: autores[0] ?? null,
+    autores_extra: autores.slice(1),
+    anio: anioDe(extraerDc(xml, 'date').join(' ')),
+    editorial: editorialBne(extraerDc(xml, 'publisher')),
+    paginas: null,
+    portada: null,
+    sinopsis: null,
+    isbn,
+  };
+}
+
+/**
+ * Portada de Open Library por ISBN. Existe para muchísimos libros aunque Open
+ * Library no tenga su ficha de datos (p. ej. cuando solo los encuentra la BNE).
+ * Con `default=false` devuelve 404 si no hay portada, así no servimos una en blanco.
+ */
+async function portadaOpenLibraryIsbn(isbn: string): Promise<string | null> {
+  const url = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
+  try {
+    const res = await fetch(`${url}?default=false`, { method: 'HEAD' });
+    return res.ok ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Toma `base` y rellena sus campos vacíos con los de `extra`. */
 function fusionar(base: DatosLibro | null, extra: DatosLibro | null): DatosLibro | null {
   if (!base) return extra;
@@ -131,11 +239,21 @@ export async function buscarDatos(consulta: string): Promise<DatosLibro> {
   if (!q) return { encontrado: false };
   const isbn = esIsbn(q);
   if (isbn) {
-    const [g, o] = await Promise.all([
+    const [g, o, b] = await Promise.all([
       googleBooks(`isbn:${isbn}`).catch(() => null),
       openLibraryIsbn(isbn).catch(() => null),
+      bneIsbn(isbn).catch(() => null),
     ]);
-    return fusionar(g, o) ?? { encontrado: false };
+    // Prioridad: Google Books (suele traer portada/sinopsis) → BNE (datos fiables
+    // de libro español) → Open Library. fusionar rellena los huecos del primero.
+    const r = fusionar(fusionar(g, b), o);
+    // Si nadie trajo portada (caso típico de libro solo en la BNE), probamos la
+    // de Open Library por ISBN, que existe aunque no haya ficha de datos.
+    if (r && !r.portada) {
+      const p = await portadaOpenLibraryIsbn(isbn).catch(() => null);
+      if (p) r.portada = p;
+    }
+    return r ?? { encontrado: false };
   }
   // Por título: Google Books primero; si falla o no encuentra, Open Library.
   const r =
