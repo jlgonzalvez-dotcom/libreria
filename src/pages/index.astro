@@ -13,6 +13,44 @@ const total = libros.length;
 // Nº de autores distintos (dato de catálogo; no revela el estado de lectura).
 const autores = new Set(libros.map((l) => l.autor)).size;
 
+// ── Datos para los gráficos del hero (modales) ───────────────────────────────
+const conteoCat = new Map<string, number>();
+for (const l of libros) conteoCat.set(l.categoria, (conteoCat.get(l.categoria) ?? 0) + 1);
+const datosCategorias = [...conteoCat.entries()]
+  .map(([nombre, n]) => ({ nombre, n }))
+  .sort((a, b) => b.n - a.n);
+
+const conteoAut = new Map<string, number>();
+for (const l of libros) conteoAut.set(l.autor, (conteoAut.get(l.autor) ?? 0) + 1);
+const datosAutores = [...conteoAut.entries()]
+  .map(([nombre, n]) => ({ nombre, n }))
+  .sort((a, b) => b.n - a.n)
+  .slice(0, 10);
+const maxAutor = datosAutores[0]?.n ?? 1;
+
+// Paleta de la tarta (tonos de la web: burdeos, oro, verde, azul, terracota…).
+const PALETA_TARTA = [
+  '#7c2d2d', '#b0823f', '#3f6b54', '#3a5a78', '#a8533f',
+  '#5f2121', '#d8b87e', '#6f8f6a', '#8a6d9a', '#c2705a',
+  '#9a8f81', '#4a6b7a',
+];
+
+// Sectores de la tarta (paths SVG) calculados en SSR a partir de las categorías.
+const totalCat = datosCategorias.reduce((s, d) => s + d.n, 0) || 1;
+const R = 92, CX = 100, CY = 100;
+let _ang = -Math.PI / 2; // arrancar arriba
+const sectores = datosCategorias.map((d, i) => {
+  const frac = d.n / totalCat;
+  const a0 = _ang;
+  const a1 = _ang + frac * 2 * Math.PI;
+  _ang = a1;
+  const x0 = CX + R * Math.cos(a0), y0 = CY + R * Math.sin(a0);
+  const x1 = CX + R * Math.cos(a1), y1 = CY + R * Math.sin(a1);
+  const grande = frac > 0.5 ? 1 : 0;
+  const path = `M ${CX} ${CY} L ${x0.toFixed(2)} ${y0.toFixed(2)} A ${R} ${R} 0 ${grande} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z`;
+  return { ...d, path, color: PALETA_TARTA[i % PALETA_TARTA.length], pct: Math.round(frac * 100) };
+});
+
 // Destacados del hero: los libros de 5 estrellas. Si hay muchos, se barajan y
 // se muestran como máximo MAX_DESTACADOS, rotando en cada carga (SSR → cada
 // visita ejecuta esto de nuevo, así que el orden cambia al recargar).
@@ -43,9 +81,9 @@ function estrellas(n?: number | null) {
         <h1>Una colección<br />cuidada, libro a libro.</h1>
         <p class="hero-lead">Busca por título o autor, o explora la colección por categoría.</p>
         <div class="stats">
-          <div class="stat"><strong>{total}</strong><span>Libros</span></div>
-          <div class="stat"><strong>{categorias.length}</strong><span>Categorías</span></div>
-          <div class="stat"><strong>{autores}</strong><span>Autores</span></div>
+          <button class="stat" type="button" data-stat="catalogo" title="Bajar al catálogo"><strong>{total}</strong><span>Libros</span></button>
+          <button class="stat" type="button" data-stat="categorias" title="Ver reparto por categoría"><strong>{categorias.length}</strong><span>Categorías</span></button>
+          <button class="stat" type="button" data-stat="autores" title="Ver autores más frecuentes"><strong>{autores}</strong><span>Autores</span></button>
         </div>
       </div>
 
@@ -155,6 +193,49 @@ function estrellas(n?: number | null) {
       )
     }
   </section>
+
+  <div class="modal-grafico" id="modal-grafico" hidden>
+    <div class="modal-fondo" data-cerrar></div>
+    <div class="modal-caja" role="dialog" aria-modal="true" aria-label="Estadísticas de la colección">
+      <button class="modal-cerrar" type="button" data-cerrar aria-label="Cerrar">✕</button>
+
+      <div class="grafico-panel" id="panel-categorias">
+        <h3 class="grafico-titulo">Reparto por categoría</h3>
+        <div class="tarta-bloque">
+          <svg class="tarta" viewBox="0 0 200 200" role="img" aria-label="Distribución de libros por categoría">
+            {sectores.length === 1
+              ? <circle cx="100" cy="100" r="92" fill={sectores[0].color} />
+              : sectores.map((s) => <path d={s.path} fill={s.color}><title>{s.nombre}: {s.n} ({s.pct}%)</title></path>)}
+            <circle cx="100" cy="100" r="46" class="tarta-centro" />
+            <text x="100" y="96" text-anchor="middle" class="tarta-num">{total}</text>
+            <text x="100" y="114" text-anchor="middle" class="tarta-lbl">LIBROS</text>
+          </svg>
+          <ul class="tarta-leyenda">
+            {sectores.map((s) => (
+              <li>
+                <span class="punto" style={`background:${s.color}`}></span>
+                <span class="ley-nombre">{s.nombre}</span>
+                <span class="ley-num">{s.n} · {s.pct}%</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <div class="grafico-panel" id="panel-autores" hidden>
+        <h3 class="grafico-titulo">Autores con más libros</h3>
+        <ul class="barras">
+          {datosAutores.map((a) => (
+            <li class="barra-fila">
+              <span class="barra-nombre" title={a.nombre}>{a.nombre}</span>
+              <span class="barra-track"><span class="barra-fill" style={`width:${Math.round((a.n / maxAutor) * 100)}%`}></span></span>
+              <span class="barra-num">{a.n}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </div>
 </Layout>
 
 <script>
@@ -211,4 +292,30 @@ function estrellas(n?: number | null) {
   let vistaGuardada = 'rejilla';
   try { if (localStorage.getItem('vista') === 'lista') vistaGuardada = 'lista'; } catch (e) {}
   setVista(vistaGuardada);
+
+  // ── Modales de estadísticas (botones del hero) ───────────────────────────
+  const modal = document.getElementById('modal-grafico');
+  const panelCat = document.getElementById('panel-categorias');
+  const panelAut = document.getElementById('panel-autores');
+  function abrirModal(tipo: string) {
+    if (!modal || !panelCat || !panelAut) return;
+    panelCat.hidden = tipo !== 'categorias';
+    panelAut.hidden = tipo !== 'autores';
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+  function cerrarModal() {
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.style.overflow = '';
+  }
+  document.querySelectorAll<HTMLElement>('.stat').forEach((b) =>
+    b.addEventListener('click', () => {
+      const t = b.dataset.stat;
+      if (t === 'catalogo') document.querySelector('.catalogo')?.scrollIntoView({ behavior: 'smooth' });
+      else if (t) abrirModal(t);
+    }),
+  );
+  modal?.querySelectorAll('[data-cerrar]').forEach((el) => el.addEventListener('click', cerrarModal));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarModal(); });
 </script>

@@ -599,6 +599,59 @@ a:hover { color: var(--acento-osc); }
 .rejilla.lista .libro .meta { margin-top: 7px; padding-top: 7px; }
 .rejilla.lista .libro:hover { transform: translateY(-2px); }
 
+/* ── Cifras del hero como botones (abren gráficos / bajan al catálogo) ───── */
+.stat {
+  background: transparent; border-top: none; border-right: none; border-bottom: none;
+  border-radius: 0; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  transition: transform 0.18s ease;
+}
+.stat strong, .stat span { transition: color 0.18s ease; }
+.stat:hover { transform: translateY(-3px); }
+.stat:hover strong { color: var(--acento-osc); }
+.stat:hover span { color: var(--acento); }
+
+/* ── Modal de gráficos ──────────────────────────────────────────────────── */
+.modal-grafico { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 22px; }
+.modal-grafico[hidden] { display: none; }
+.modal-fondo { position: absolute; inset: 0; background: rgba(18, 13, 8, 0.55); backdrop-filter: blur(2px); }
+.modal-caja {
+  position: relative; background: var(--crema); border: 1px solid var(--linea);
+  border-radius: var(--radio); padding: 30px 32px; width: 100%; max-width: 560px;
+  max-height: 88vh; overflow: auto; box-shadow: var(--sombra-lg);
+  animation: modalEntra 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+@keyframes modalEntra { from { opacity: 0; transform: translateY(14px) scale(0.97); } to { opacity: 1; transform: none; } }
+.modal-cerrar {
+  position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 999px;
+  border: 1px solid var(--linea); background: var(--papel-2); color: var(--tinta-suave);
+  cursor: pointer; font-size: 0.9rem; line-height: 1; transition: color 0.2s, border-color 0.2s;
+}
+.modal-cerrar:hover { color: var(--acento); border-color: var(--acento); }
+.grafico-titulo { font-family: var(--serif); font-size: 1.35rem; margin: 0 0 20px; }
+.grafico-titulo::before { content: "✦"; color: var(--oro); font-size: 0.7rem; margin-right: 10px; vertical-align: middle; }
+
+/* Tarta (donut) */
+.tarta-bloque { display: flex; gap: 26px; align-items: center; flex-wrap: wrap; }
+.tarta { width: 188px; height: 188px; flex: 0 0 auto; display: block; }
+.tarta path { stroke: var(--crema); stroke-width: 1.5; }
+.tarta-centro { fill: var(--crema); }
+.tarta-num { font-family: var(--serif); font-size: 30px; font-weight: 600; fill: var(--tinta); }
+.tarta-lbl { font-size: 9px; fill: var(--tinta-tenue); letter-spacing: 0.16em; }
+.tarta-leyenda { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 190px; display: flex; flex-direction: column; gap: 8px; }
+.tarta-leyenda li { display: flex; align-items: center; gap: 10px; font-size: 0.88rem; }
+.punto { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; }
+.ley-nombre { flex: 1; color: var(--tinta); }
+.ley-num { color: var(--tinta-tenue); font-size: 0.8rem; white-space: nowrap; }
+
+/* Barras (top autores) */
+.barras { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.barra-fila { display: grid; grid-template-columns: 135px 1fr 26px; align-items: center; gap: 12px; }
+.barra-nombre { font-size: 0.82rem; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tinta); }
+.barra-track { background: var(--papel-2); border-radius: 999px; height: 15px; overflow: hidden; }
+.barra-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--acento-claro), var(--acento)); animation: barraCrece 0.55s cubic-bezier(0.2, 0.7, 0.3, 1); }
+@keyframes barraCrece { from { width: 0; } }
+.barra-num { font-size: 0.82rem; color: var(--tinta-suave); font-weight: 600; text-align: center; }
+
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 880px) {
   .hero-inner {
