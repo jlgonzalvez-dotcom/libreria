@@ -22,6 +22,7 @@ export type Database = {
           destacado: boolean
           edicion: number | null
           editorial: string | null
+          ejemplares: number
           en_venta: boolean
           estado: string
           estado_conservacion: string | null
@@ -52,6 +53,7 @@ export type Database = {
           destacado?: boolean
           edicion?: number | null
           editorial?: string | null
+          ejemplares?: number
           en_venta?: boolean
           estado?: string
           estado_conservacion?: string | null
@@ -82,6 +84,7 @@ export type Database = {
           destacado?: boolean
           edicion?: number | null
           editorial?: string | null
+          ejemplares?: number
           en_venta?: boolean
           estado?: string
           estado_conservacion?: string | null

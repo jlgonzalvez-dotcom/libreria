@@ -51,6 +51,7 @@ const aviso = ok ? mensajes[ok] : '';
                 <td>
                   <a href={`/admin/${libro.id}`} class="td-titulo">{libro.titulo}</a>
                   {libro.destacado && <span class="badge dest">★ destacado</span>}
+                  {libro.ejemplares > 1 && <span class="badge">×{libro.ejemplares} ejemplares</span>}
                 </td>
                 <td>{libro.autor}</td>
                 <td><span class="badge cat">{libro.categoria}</span></td>
