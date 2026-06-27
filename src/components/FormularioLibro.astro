@@ -438,8 +438,12 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
           if (data.isbnInvalido) {
             msg.textContent = AVISO_ISBN;
             msg.classList.add('alerta');
+          } else if (validarIsbn(consulta) === 'valido') {
+            msg.textContent = '⚠️ No encontramos ningún libro con ese ISBN. Revisa que sea correcto o complétalo a mano.';
+            msg.classList.add('alerta');
           } else {
             msg.textContent = 'No se encontraron datos. Rellénalo a mano.';
+            msg.classList.remove('alerta');
           }
         }
         return;

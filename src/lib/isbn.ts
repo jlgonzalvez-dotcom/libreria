@@ -31,6 +31,23 @@ export function isbnChecksumOk(isbn: string): boolean {
   return false;
 }
 
+/** Núcleo de 9 dígitos de un ISBN (sin el prefijo 978/979 ni el dígito de
+ *  control), común al ISBN-10 y al ISBN-13 del mismo libro. Sirve para comparar
+ *  identificadores que pueden venir en cualquiera de los dos formatos, con
+ *  guiones o con prefijos como "isbn:". Devuelve null si no es un ISBN. */
+export function nucleoIsbn(s: string): string | null {
+  const x = s.replace(/[^0-9Xx]/g, '');
+  if (/^\d{13}$/.test(x)) return x.slice(3, 12);
+  if (/^\d{9}[\dXx]$/.test(x)) return x.slice(0, 9);
+  return null;
+}
+
+/** ¿Dos cadenas representan el mismo ISBN (aunque una sea ISBN-10 y otra -13)? */
+export function mismoLibroIsbn(a: string, b: string): boolean {
+  const na = nucleoIsbn(a);
+  return na !== null && na === nucleoIsbn(b);
+}
+
 /** Clasifica una entrada del usuario:
  *   - 'valido':   tiene forma de ISBN y el dígito de control cuadra.
  *   - 'invalido': tiene forma de ISBN (10/13 cifras) pero el dígito NO cuadra

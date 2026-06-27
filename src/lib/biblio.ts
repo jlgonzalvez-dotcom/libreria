@@ -12,7 +12,7 @@
 // Nota: NO mandar User-Agent propio — la CDN de Open Library corta la conexión
 // con cabeceras de cliente personalizadas desde el servidor (fetch failed).
 import { GOOGLE_BOOKS_API_KEY } from 'astro:env/server';
-import { esIsbn, validarIsbn } from './isbn';
+import { esIsbn, validarIsbn, mismoLibroIsbn } from './isbn';
 
 export interface DatosLibro {
   encontrado: boolean;
@@ -38,14 +38,20 @@ function anioDe(fecha?: string): number | null {
   return m ? Number(m[0]) : null;
 }
 
-async function googleBooks(q: string): Promise<DatosLibro | null> {
+async function googleBooks(q: string, isbnEsperado?: string): Promise<DatosLibro | null> {
   // Si hay clave propia, se añade para usar la cuota propia (no la compartida).
   const key = GOOGLE_BOOKS_API_KEY ? `&key=${GOOGLE_BOOKS_API_KEY}` : '';
   const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&country=ES&maxResults=5${key}`;
   const res = await fetch(url);
   if (!res.ok) return null;
   const data: any = await res.json();
-  const vi = data.items?.[0]?.volumeInfo;
+  const items: any[] = data.items ?? [];
+  // Si buscamos por ISBN, tomamos el resultado que realmente lleva ese ISBN
+  // (Google a veces devuelve coincidencias laxas que no corresponden).
+  const item = isbnEsperado
+    ? items.find((it) => (it.volumeInfo?.industryIdentifiers ?? []).some((x: any) => mismoLibroIsbn(isbnEsperado, x.identifier)))
+    : items[0];
+  const vi = item?.volumeInfo;
   if (!vi) return null;
   const autores: string[] = vi.authors ?? [];
   const ids: any[] = vi.industryIdentifiers ?? [];
@@ -190,6 +196,9 @@ async function bneIsbn(isbn: string): Promise<DatosLibro | null> {
   const xml = await res.text();
   const titulos = extraerDc(xml, 'title');
   if (titulos.length === 0) return null;
+  // La BNE a veces hace match laxo y devuelve un libro que NO lleva el ISBN
+  // buscado: lo descartamos comprobando los identificadores del registro.
+  if (!extraerDc(xml, 'identifier').some((id) => mismoLibroIsbn(isbn, id))) return null;
   const personas = [...extraerDc(xml, 'creator'), ...extraerDc(xml, 'contributor')];
   const autores = personas
     .filter((p) => !ROL_SECUNDARIO.test(p)) // descartar traductores/editores/…
@@ -231,6 +240,8 @@ async function k10plusIsbn(isbn: string): Promise<DatosLibro | null> {
   }
   const titulos = extraerDc(xml, 'title');
   if (titulos.length === 0) return null;
+  // K10plus también puede devolver resultados laxos: exigimos el ISBN buscado.
+  if (!extraerDc(xml, 'identifier').some((id) => mismoLibroIsbn(isbn, id))) return null;
   // Autor principal: primer creator; si no hay, primer contributor (K10plus no
   // marca el rol en el texto, así que NO importamos coautores para no colar
   // traductores). Reutiliza limpiarPersonaBne ("Apellido, Nombre 1963-").
@@ -295,7 +306,7 @@ export async function buscarDatos(consulta: string): Promise<DatosLibro> {
   const isbn = esIsbn(q);
   if (isbn) {
     const [g, o, b, k] = await Promise.all([
-      googleBooks(`isbn:${isbn}`).catch(() => null),
+      googleBooks(`isbn:${isbn}`, isbn).catch(() => null),
       openLibraryIsbn(isbn).catch(() => null),
       bneIsbn(isbn).catch(() => null),
       k10plusIsbn(isbn).catch(() => null),
