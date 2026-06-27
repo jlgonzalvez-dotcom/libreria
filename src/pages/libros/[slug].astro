@@ -38,7 +38,7 @@ const notasHtml = libro.notas ? marked.parse(libro.notas) : '';
 
           <div class="ficha">
             <dl>
-              {libro.anio && (<><dt>Año</dt><dd>{libro.anio}</dd></>)}
+              {libro.anio && (<><dt>Año de impresión</dt><dd>{libro.anio}</dd></>)}
               {libro.editorial && (<><dt>Editorial</dt><dd>{libro.editorial}</dd></>)}
               {libro.edicion && (<><dt>Edición</dt><dd>{libro.edicion}ª</dd></>)}
               {libro.paginas && (<><dt>Páginas</dt><dd>{libro.paginas}</dd></>)}
