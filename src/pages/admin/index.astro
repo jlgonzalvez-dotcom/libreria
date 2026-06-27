@@ -31,6 +31,10 @@ const aviso = ok ? mensajes[ok] : '';
       total === 0 ? (
         <p class="vacio">Todavía no hay libros. <a href="/admin/nuevo">Añade el primero</a>.</p>
       ) : (
+        <>
+        <div class="admin-buscar" style="margin: 4px 0 20px">
+          <input id="admin-buscador" class="buscador" type="search" placeholder="Buscar por título, autor o categoría…" autocomplete="off" />
+        </div>
         <table class="tabla">
           <thead>
             <tr>
@@ -43,7 +47,7 @@ const aviso = ok ? mensajes[ok] : '';
           </thead>
           <tbody>
             {libros.map((libro) => (
-              <tr>
+              <tr data-busqueda={`${libro.titulo} ${libro.autor} ${libro.categoria}`.toLowerCase()}>
                 <td>
                   <a href={`/admin/${libro.id}`} class="td-titulo">{libro.titulo}</a>
                   {libro.destacado && <span class="badge dest">★ destacado</span>}
@@ -68,7 +72,28 @@ const aviso = ok ? mensajes[ok] : '';
             ))}
           </tbody>
         </table>
+        </>
       )
     }
   </section>
 </AdminLayout>
+
+<script>
+  const buscador = document.getElementById('admin-buscador') as HTMLInputElement | null;
+  const filas = Array.from(document.querySelectorAll<HTMLElement>('tbody tr'));
+  const sub = document.querySelector('.admin-sub');
+  const totalLibros = filas.length;
+  const plural = (n: number) => `${n} ${n === 1 ? 'libro' : 'libros'}`;
+  buscador?.addEventListener('input', () => {
+    const q = buscador.value.trim().toLowerCase();
+    let visibles = 0;
+    for (const tr of filas) {
+      const ok = q === '' || (tr.dataset.busqueda ?? '').includes(q);
+      tr.style.display = ok ? '' : 'none';
+      if (ok) visibles++;
+    }
+    if (sub) sub.textContent = q === ''
+      ? `${plural(totalLibros)} en el catálogo.`
+      : `${visibles} de ${plural(totalLibros)}.`;
+  });
+</script>
