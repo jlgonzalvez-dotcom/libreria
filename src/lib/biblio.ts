@@ -1,11 +1,17 @@
-// Búsqueda de datos bibliográficos en fuentes gratuitas y sin clave:
-//  · Por ISBN: Google Books + Open Library + BNE (Biblioteca Nacional de España).
+// Búsqueda de datos bibliográficos en fuentes gratuitas:
+//  · Por ISBN: Google Books + Open Library + BNE + K10plus (en paralelo).
 //  · Por título: Google Books + Open Library.
-// La BNE cubre prácticamente todo lo publicado en España (incluido libro antiguo
-// y agotado) que suele faltar en Google Books y Open Library.
+// Cada fuente cubre un hueco distinto:
+//  · Google Books: lo más completo (portada + sinopsis), pero su cuota SIN clave
+//    es compartida y se agota (429). Con GOOGLE_BOOKS_API_KEY usa cuota propia.
+//  · BNE: casi todo lo publicado en España (incluido libro antiguo y agotado).
+//  · K10plus (catálogo de bibliotecas alemanas): mucho libro internacional en
+//    inglés (que ni Open Library —sin ficha— ni la BNE —solo español— traen).
+//  · Open Library: portadas por ISBN (existen aunque no haya ficha de datos).
 // Lo usan el autocompletado por ISBN/título y el OCR de portadas.
 // Nota: NO mandar User-Agent propio — la CDN de Open Library corta la conexión
 // con cabeceras de cliente personalizadas desde el servidor (fetch failed).
+import { GOOGLE_BOOKS_API_KEY } from 'astro:env/server';
 
 export interface DatosLibro {
   encontrado: boolean;
@@ -35,7 +41,9 @@ function anioDe(fecha?: string): number | null {
 }
 
 async function googleBooks(q: string): Promise<DatosLibro | null> {
-  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&country=ES&maxResults=5`;
+  // Si hay clave propia, se añade para usar la cuota propia (no la compartida).
+  const key = GOOGLE_BOOKS_API_KEY ? `&key=${GOOGLE_BOOKS_API_KEY}` : '';
+  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&country=ES&maxResults=5${key}`;
   const res = await fetch(url);
   if (!res.ok) return null;
   const data: any = await res.json();
@@ -121,9 +129,10 @@ function desescaparXml(s: string): string {
     .replace(/&amp;/g, '&');
 }
 
-/** Texto de todas las etiquetas <dc:tag> del XML (se pide maximumRecords=1). */
+/** Texto de todas las etiquetas <dc:tag> del XML (se pide maximumRecords=1).
+ *  Admite atributos en la etiqueta (p. ej. el xmlns que añade K10plus). */
 function extraerDc(xml: string, tag: string): string[] {
-  const re = new RegExp(`<dc:${tag}>([\\s\\S]*?)</dc:${tag}>`, 'g');
+  const re = new RegExp(`<dc:${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</dc:${tag}>`, 'g');
   const out: string[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(xml)) !== null) {
@@ -136,19 +145,23 @@ function extraerDc(xml: string, tag: string): string[] {
 // Roles de la BNE que NO son el autor principal (traductor, editor, ilustrador…).
 const ROL_SECUNDARIO = /\s(trad|il|ed|dir|comp|coord|pr|ant|rev|col|pref|introd)\.?$/i;
 
-/** "Ruiz Zafón, Carlos 1964-2020 aut" → "Carlos Ruiz Zafón". */
+/** Normaliza una persona de un catálogo Dublin Core a "Nombre Apellidos".
+ *  Cubre el formato de la BNE ("Ruiz Zafón, Carlos 1964-2020 aut") y el de
+ *  K10plus ("Kasparov, Garri , 1963-", con coma extra y fecha abierta). */
 function limpiarPersonaBne(s: string): string {
   let t = s
-    .replace(/\b\d{4}(-\d{0,4})?\b/g, ' ') // fechas de nacimiento/muerte
-    .replace(/\s(aut|trad|il|ed|dir|comp|coord|pr|ant|rev|col|pref|introd)\.?\s*$/i, '') // rol
+    .replace(/\s*\([^)]*\)/g, ' ') // roles entre paréntesis de K10plus ("(VerfasserIn)"…)
+    .replace(/\d{4}\s*-\s*\d{0,4}/g, ' ') // rangos de fechas, incl. abiertos ("1963-")
+    .replace(/\b\d{4}\b/g, ' ') // año suelto
+    .replace(/\s(aut|trad|il|ed|dir|comp|coord|pr|ant|rev|col|pref|introd)\.?\s*$/i, '') // rol final
     .replace(/\s{2,}/g, ' ')
-    .replace(/[.,;\s]+$/, '')
+    .replace(/[\s,;-]+$/, '') // restos al final tras quitar la fecha (", -", etc.)
     .trim();
   const c = t.indexOf(',');
   if (c > 0) {
     const apellidos = t.slice(0, c).trim();
-    const nombre = t.slice(c + 1).trim();
-    if (nombre) t = `${nombre} ${apellidos}`;
+    const nombre = t.slice(c + 1).replace(/[\s,;-]+/g, ' ').trim(); // limpia restos internos
+    t = nombre ? `${nombre} ${apellidos}` : apellidos;
   }
   return t.trim();
 }
@@ -199,6 +212,47 @@ async function bneIsbn(isbn: string): Promise<DatosLibro | null> {
   };
 }
 
+// ── K10plus (catálogo unificado de bibliotecas alemanas, SRU/Dublin Core) ───
+// Sin clave ni cuota. Cataloga muchísimo libro internacional en inglés (ajedrez,
+// novela…) que ni Open Library (a menudo sin ficha) ni la BNE (solo España)
+// traen. Reutiliza el mismo parser Dublin Core que la BNE.
+const K10PLUS_SRU = 'https://sru.k10plus.de/gvk';
+
+async function k10plusIsbn(isbn: string): Promise<DatosLibro | null> {
+  const url = `${K10PLUS_SRU}?version=1.1&operation=searchRetrieve&query=pica.isb%3D${isbn}&maximumRecords=1&recordSchema=dc`;
+  // Timeout propio: es una fuente externa más lenta y no debe retrasar al resto.
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 6000);
+  let xml: string;
+  try {
+    const res = await fetch(url, { signal: ac.signal });
+    if (!res.ok) return null;
+    xml = await res.text();
+  } finally {
+    clearTimeout(t);
+  }
+  const titulos = extraerDc(xml, 'title');
+  if (titulos.length === 0) return null;
+  // Autor principal: primer creator; si no hay, primer contributor (K10plus no
+  // marca el rol en el texto, así que NO importamos coautores para no colar
+  // traductores). Reutiliza limpiarPersonaBne ("Apellido, Nombre 1963-").
+  const personas = [...extraerDc(xml, 'creator'), ...extraerDc(xml, 'contributor')];
+  const autor = personas.map(limpiarPersonaBne).find(Boolean) ?? null;
+  return {
+    encontrado: true,
+    fuente: 'K10plus',
+    titulo: quitarSoporteBne(titulos[0]),
+    autor,
+    autores_extra: [],
+    anio: anioDe(extraerDc(xml, 'date').join(' ')),
+    editorial: editorialBne(extraerDc(xml, 'publisher')),
+    paginas: null,
+    portada: null,
+    sinopsis: null,
+    isbn,
+  };
+}
+
 /**
  * Portada de Open Library por ISBN. Existe para muchísimos libros aunque Open
  * Library no tenga su ficha de datos (p. ej. cuando solo los encuentra la BNE).
@@ -239,14 +293,16 @@ export async function buscarDatos(consulta: string): Promise<DatosLibro> {
   if (!q) return { encontrado: false };
   const isbn = esIsbn(q);
   if (isbn) {
-    const [g, o, b] = await Promise.all([
+    const [g, o, b, k] = await Promise.all([
       googleBooks(`isbn:${isbn}`).catch(() => null),
       openLibraryIsbn(isbn).catch(() => null),
       bneIsbn(isbn).catch(() => null),
+      k10plusIsbn(isbn).catch(() => null),
     ]);
-    // Prioridad: Google Books (suele traer portada/sinopsis) → BNE (datos fiables
-    // de libro español) → Open Library. fusionar rellena los huecos del primero.
-    const r = fusionar(fusionar(g, b), o);
+    // Prioridad: Google Books (suele traer portada/sinopsis) → BNE (libro español
+    // fiable) → K10plus (libro internacional en inglés) → Open Library. fusionar
+    // rellena los huecos del primero con los siguientes.
+    const r = fusionar(fusionar(fusionar(g, b), k), o);
     // Si nadie trajo portada (caso típico de libro solo en la BNE), probamos la
     // de Open Library por ISBN, que existe aunque no haya ficha de datos.
     if (r && !r.portada) {

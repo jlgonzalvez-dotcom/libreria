@@ -28,6 +28,11 @@ export default defineConfig({
       ADMIN_PASSWORD: envField.string({ context: 'server', access: 'secret' }),
       // Secreto para firmar la cookie de sesión del admin
       AUTH_SECRET: envField.string({ context: 'server', access: 'secret' }),
+      // Clave propia (gratuita) de Google Books. OPCIONAL: si está, el
+      // autocompletado por ISBN/título usa tu cuota propia (~1.000/día) en vez
+      // de la compartida que se agota (error 429). Si falta, funciona igual con
+      // la cuota compartida. Se genera en Google Cloud (API "Books API").
+      GOOGLE_BOOKS_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
     },
   },
 });
