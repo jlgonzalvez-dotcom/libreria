@@ -508,6 +508,8 @@ a:hover { color: var(--acento-osc); }
 .check { display: flex; align-items: center; gap: 9px; font-size: 0.92rem; color: var(--tinta); margin-bottom: 4px; }
 .check input { width: auto; accent-color: var(--acento); }
 .ayuda { color: var(--tinta-tenue); font-weight: 400; font-size: 0.82rem; }
+/* Aviso de ISBN no válido: mismo hueco que .ayuda, pero llama la atención. */
+.ayuda.alerta { color: var(--acento); font-weight: 600; }
 .autocompletar { background: var(--papel-2); padding: 16px; border-radius: var(--radio-sm); border: 1px solid var(--linea); }
 .autocompletar-fila { display: flex; gap: 10px; flex-wrap: wrap; }
 .autocompletar-fila input { flex: 1; min-width: 180px; }

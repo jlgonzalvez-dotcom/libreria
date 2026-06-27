@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { crearLibro, actualizarLibro, generarSlugUnico } from '../../lib/libros';
-import { esIsbn } from '../../lib/biblio';
+import { esIsbn } from '../../lib/isbn';
 
 // ── Helpers de parseo del formulario ─────────────────────────────────────────
 function lista(valor: FormDataEntryValue | null): string[] {

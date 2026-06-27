@@ -12,9 +12,12 @@
 // Nota: NO mandar User-Agent propio — la CDN de Open Library corta la conexión
 // con cabeceras de cliente personalizadas desde el servidor (fetch failed).
 import { GOOGLE_BOOKS_API_KEY } from 'astro:env/server';
+import { esIsbn, validarIsbn } from './isbn';
 
 export interface DatosLibro {
   encontrado: boolean;
+  /** true si la consulta parecía un ISBN pero su dígito de control no cuadra. */
+  isbnInvalido?: boolean;
   fuente?: string;
   titulo?: string | null;
   autor?: string | null;
@@ -27,12 +30,7 @@ export interface DatosLibro {
   isbn?: string | null;
 }
 
-/** Si la consulta es un ISBN-10/13 (con o sin guiones), devuelve el ISBN limpio. */
-export function esIsbn(s: string): string | null {
-  const limpio = s.replace(/[\s-]/g, '');
-  if (/^\d{9}[\dXx]$/.test(limpio) || /^\d{13}$/.test(limpio)) return limpio;
-  return null;
-}
+// esIsbn / validarIsbn viven en ./isbn (lógica pura, también usada en el navegador).
 
 function anioDe(fecha?: string): number | null {
   if (!fecha) return null;
@@ -291,6 +289,9 @@ function fusionar(base: DatosLibro | null, extra: DatosLibro | null): DatosLibro
 export async function buscarDatos(consulta: string): Promise<DatosLibro> {
   const q = consulta.trim();
   if (!q) return { encontrado: false };
+  // Si parece un ISBN pero el dígito de control no cuadra, avisamos sin buscar:
+  // casi seguro es un error de tecleo/lectura (un número cambiado).
+  if (validarIsbn(q) === 'invalido') return { encontrado: false, isbnInvalido: true };
   const isbn = esIsbn(q);
   if (isbn) {
     const [g, o, b, k] = await Promise.all([

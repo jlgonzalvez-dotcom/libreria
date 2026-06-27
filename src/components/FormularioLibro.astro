@@ -262,6 +262,8 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
 </div>
 
 <script>
+  import { validarIsbn } from '../lib/isbn';
+
   const $ = (id: string) => document.getElementById(id);
 
   // ── Portada: previsualización + subida ─────────────────────────────────────
@@ -371,6 +373,23 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
   const isbnInput = $('isbn') as HTMLInputElement | null;
   const msg = $('autocompletar-msg');
 
+  const AVISO_ISBN = '⚠️ Ese ISBN no parece válido — revisa los dígitos.';
+
+  // Avisa si lo escrito tiene forma de ISBN (10/13 cifras) pero su dígito de
+  // control no cuadra (casi siempre, un número mal tecleado o mal escaneado).
+  function revisarIsbn() {
+    if (!msg || !isbnInput) return;
+    if (validarIsbn(isbnInput.value.trim()) === 'invalido') {
+      msg.textContent = AVISO_ISBN;
+      msg.classList.add('alerta');
+    } else if (msg.classList.contains('alerta')) {
+      msg.textContent = ''; // ya no es inválido: quitamos la alerta
+      msg.classList.remove('alerta');
+    }
+  }
+  isbnInput?.addEventListener('input', revisarIsbn);
+  isbnInput?.addEventListener('blur', revisarIsbn);
+
   function set(id: string, valor: unknown) {
     if (valor == null || valor === '') return;
     const el = $(id) as HTMLInputElement | HTMLTextAreaElement | null;
@@ -397,17 +416,29 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
       if (msg) msg.textContent = 'Escribe un ISBN o un título primero.';
       return;
     }
+    // ISBN con dígito de control incorrecto: avisamos y no buscamos (está mal).
+    if (validarIsbn(consulta) === 'invalido') {
+      revisarIsbn();
+      return;
+    }
     if (btn) btn.disabled = true;
-    if (msg) msg.textContent = 'Buscando…';
+    if (msg) { msg.textContent = 'Buscando…'; msg.classList.remove('alerta'); }
     try {
       const res = await fetch(`/api/autocompletar?q=${encodeURIComponent(consulta)}`);
       const data = await res.json();
       if (!res.ok || !data.encontrado) {
-        if (msg) msg.textContent = 'No se encontraron datos. Rellénalo a mano.';
+        if (msg) {
+          if (data.isbnInvalido) {
+            msg.textContent = AVISO_ISBN;
+            msg.classList.add('alerta');
+          } else {
+            msg.textContent = 'No se encontraron datos. Rellénalo a mano.';
+          }
+        }
         return;
       }
       aplicarResultado(data);
-      if (msg) msg.textContent = `Datos de ${data.fuente}. Revisa y completa lo que falte.`;
+      if (msg) { msg.textContent = `Datos de ${data.fuente}. Revisa y completa lo que falte.`; msg.classList.remove('alerta'); }
     } catch {
       if (msg) msg.textContent = 'Error al buscar. Inténtalo de nuevo.';
     } finally {
