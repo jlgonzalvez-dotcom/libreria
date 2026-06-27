@@ -111,6 +111,10 @@ function estrellas(n?: number | null) {
         <button class="chip activo" data-cat="*">Todas</button>
         {categorias.map((c) => <button class="chip" data-cat={c}>{c}</button>)}
       </div>
+      <div class="vista-toggle" id="vista-toggle" role="group" aria-label="Modo de vista">
+        <button class="vista-btn activo" data-vista="rejilla" type="button" aria-label="Ver en rejilla" title="Rejilla">▦</button>
+        <button class="vista-btn" data-vista="lista" type="button" aria-label="Ver en lista" title="Lista">☰</button>
+      </div>
     </div>
 
     {
@@ -188,4 +192,23 @@ function estrellas(n?: number | null) {
     texto = buscador.value.trim().toLowerCase();
     aplicar();
   });
+
+  // ── Vista rejilla / lista (se recuerda en el navegador) ──────────────────
+  const vistaToggle = document.getElementById('vista-toggle');
+  const rejilla = document.getElementById('rejilla');
+  function setVista(v: string) {
+    if (!rejilla || !vistaToggle) return;
+    rejilla.classList.toggle('lista', v === 'lista');
+    vistaToggle.querySelectorAll<HTMLElement>('.vista-btn').forEach((b) =>
+      b.classList.toggle('activo', b.dataset.vista === v),
+    );
+    try { localStorage.setItem('vista', v); } catch (e) {}
+  }
+  vistaToggle?.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('.vista-btn') as HTMLElement | null;
+    if (b) setVista(b.dataset.vista ?? 'rejilla');
+  });
+  let vistaGuardada = 'rejilla';
+  try { if (localStorage.getItem('vista') === 'lista') vistaGuardada = 'lista'; } catch (e) {}
+  setVista(vistaGuardada);
 </script>

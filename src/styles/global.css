@@ -32,6 +32,22 @@
   --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+/* ─── Tema noche ─── Redefine la paleta (cálida, no gris frío); como todo el
+   CSS usa estas variables, la web entera cambia sola al poner data-tema. */
+html[data-tema="noche"] {
+  --papel: #16120e; --papel-2: #1f1913; --crema: #241d15;
+  --tinta: #ece3d3; --tinta-suave: #b4a994; --tinta-tenue: #8b8170;
+  --linea: #352b1f; --linea-fuerte: #483a28;
+  --acento: #db8c6b; --acento-osc: #ecab8b; --acento-claro: #b96a4f;
+  --oro: #d6b577; --oro-claro: #ecd4a3; --verde: #71a487; --azul: #6f99b8;
+  --sombra-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --sombra: 0 2px 6px rgba(0, 0, 0, 0.4), 0 14px 30px rgba(0, 0, 0, 0.55);
+  --sombra-lg: 0 22px 48px rgba(0, 0, 0, 0.65);
+}
+html[data-tema="noche"] body {
+  background-image: radial-gradient(1100px 520px at 50% -240px, #2a2013 0%, rgba(42, 32, 19, 0) 70%);
+}
+
 * { box-sizing: border-box; }
 
 html { scroll-behavior: smooth; }
@@ -45,6 +61,7 @@ body {
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 h1, h2, h3 {
@@ -550,6 +567,37 @@ a:hover { color: var(--acento-osc); }
   border-radius: var(--radio-sm); object-fit: cover;
 }
 .escaner-caja .ayuda { display: block; margin: 12px 0 16px; min-height: 1em; }
+
+/* ── Botón de tema día/noche (cabecera) ─────────────────────────────────── */
+.tema-btn {
+  background: transparent; border: 1px solid var(--linea-fuerte); color: var(--tinta-suave);
+  width: 36px; height: 36px; border-radius: 999px; margin-left: 22px; cursor: pointer;
+  font-size: 1rem; line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+  transition: border-color 0.2s, color 0.2s, transform 0.25s;
+}
+.tema-btn:hover { border-color: var(--acento); color: var(--acento); transform: rotate(-15deg); }
+
+/* ── Selector de vista del catálogo (rejilla / lista) ───────────────────── */
+.vista-toggle {
+  display: inline-flex; gap: 2px; margin-left: auto;
+  background: var(--papel-2); border: 1px solid var(--linea); border-radius: 999px; padding: 3px;
+}
+.vista-btn {
+  background: transparent; border: none; color: var(--tinta-tenue);
+  width: 36px; height: 30px; border-radius: 999px; cursor: pointer; font-size: 1rem;
+  display: inline-flex; align-items: center; justify-content: center; transition: background 0.2s, color 0.2s;
+}
+.vista-btn:hover { color: var(--acento); }
+.vista-btn.activo { background: var(--crema); color: var(--acento); box-shadow: var(--sombra-sm); }
+
+/* ── Vista en lista del catálogo ────────────────────────────────────────── */
+.rejilla.lista { grid-template-columns: 1fr; gap: 12px; padding-top: 18px; padding-bottom: 60px; }
+.rejilla.lista .libro a { flex-direction: row; align-items: stretch; }
+.rejilla.lista .libro .portada { aspect-ratio: auto; flex: 0 0 60px; font-size: 1.5rem; }
+.rejilla.lista .libro .cuerpo { padding: 12px 18px; justify-content: center; gap: 3px; }
+.rejilla.lista .libro .titulo { font-size: 1.05rem; }
+.rejilla.lista .libro .meta { margin-top: 7px; padding-top: 7px; }
+.rejilla.lista .libro:hover { transform: translateY(-2px); }
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 880px) {

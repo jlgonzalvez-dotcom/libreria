@@ -26,6 +26,15 @@ const {
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <script is:inline>
+      // Aplica el tema guardado ANTES de pintar, para que no parpadee.
+      (function () {
+        try {
+          if (localStorage.getItem('tema') === 'noche')
+            document.documentElement.setAttribute('data-tema', 'noche');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <header class="site-header">
@@ -33,6 +42,7 @@ const {
         <a href="/" class="logo">La librería de <span>JL</span></a>
         <nav class="nav">
           <a href="/">Catálogo</a>
+          <button id="tema-toggle" class="tema-btn" type="button" aria-label="Cambiar entre modo día y noche" title="Modo día / noche">🌙</button>
         </nav>
       </div>
     </header>
@@ -46,5 +56,21 @@ const {
         Catálogo personal · generado con Astro
       </div>
     </footer>
+    <script>
+      // Toggle día/noche. El tema inicial ya lo aplicó el script del <head>;
+      // aquí solo ajustamos el icono y manejamos el clic.
+      (function () {
+        const btn = document.getElementById('tema-toggle');
+        let actual = document.documentElement.getAttribute('data-tema') === 'noche' ? 'noche' : 'dia';
+        const pintar = () => { if (btn) btn.textContent = actual === 'noche' ? '☀️' : '🌙'; };
+        pintar();
+        btn?.addEventListener('click', () => {
+          actual = actual === 'noche' ? 'dia' : 'noche';
+          document.documentElement.setAttribute('data-tema', actual);
+          try { localStorage.setItem('tema', actual); } catch (e) {}
+          pintar();
+        });
+      })();
+    </script>
   </body>
 </html>
