@@ -43,7 +43,6 @@ const notasHtml = libro.notas ? marked.parse(libro.notas) : '';
               {libro.paginas && (<><dt>Páginas</dt><dd>{libro.paginas}</dd></>)}
               <dt>Idioma</dt><dd>{libro.idioma}</dd>
               <dt>Formato</dt><dd>{libro.formato}</dd>
-              <dt>Estado</dt><dd><span class={`estado ${libro.estado}`}>{libro.estado}</span></dd>
               {libro.valoracion != null && (<><dt>Valoración</dt><dd><span class="estrellas">{estrellas(libro.valoracion)}</span></dd></>)}
               {libro.isbn && (<><dt>ISBN</dt><dd>{libro.isbn}</dd></>)}
               {libro.ubicacion && (<><dt>Ubicación</dt><dd>{libro.ubicacion}</dd></>)}

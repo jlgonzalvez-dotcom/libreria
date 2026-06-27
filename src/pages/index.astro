@@ -10,7 +10,8 @@ const categorias = [...new Set(libros.map((l) => l.categoria))].sort((a, b) =>
 );
 
 const total = libros.length;
-const leidos = libros.filter((l) => l.estado === 'leído').length;
+// Nº de autores distintos (dato de catálogo; no revela el estado de lectura).
+const autores = new Set(libros.map((l) => l.autor)).size;
 
 // Destacados del hero: los libros de 5 estrellas. Si hay muchos, se barajan y
 // se muestran como máximo MAX_DESTACADOS, rotando en cada carga (SSR → cada
@@ -44,7 +45,7 @@ function estrellas(n?: number | null) {
         <div class="stats">
           <div class="stat"><strong>{total}</strong><span>Libros</span></div>
           <div class="stat"><strong>{categorias.length}</strong><span>Categorías</span></div>
-          <div class="stat"><strong>{leidos}</strong><span>Leídos</span></div>
+          <div class="stat"><strong>{autores}</strong><span>Autores</span></div>
         </div>
       </div>
 
@@ -139,7 +140,6 @@ function estrellas(n?: number | null) {
                       )}
                     </div>
                     <div class="meta">
-                      <span class={`estado ${libro.estado}`}>{libro.estado}</span>
                       {libro.anio && <span class="badge">{libro.anio}</span>}
                     </div>
                   </div>
