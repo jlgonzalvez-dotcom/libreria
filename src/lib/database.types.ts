@@ -20,6 +20,7 @@ export type Database = {
           categoria: string
           created_at: string
           destacado: boolean
+          edicion: number | null
           editorial: string | null
           en_venta: boolean
           estado: string
@@ -49,6 +50,7 @@ export type Database = {
           categoria: string
           created_at?: string
           destacado?: boolean
+          edicion?: number | null
           editorial?: string | null
           en_venta?: boolean
           estado?: string
@@ -78,6 +80,7 @@ export type Database = {
           categoria?: string
           created_at?: string
           destacado?: boolean
+          edicion?: number | null
           editorial?: string | null
           en_venta?: boolean
           estado?: string

@@ -40,6 +40,7 @@ const notasHtml = libro.notas ? marked.parse(libro.notas) : '';
             <dl>
               {libro.anio && (<><dt>Año</dt><dd>{libro.anio}</dd></>)}
               {libro.editorial && (<><dt>Editorial</dt><dd>{libro.editorial}</dd></>)}
+              {libro.edicion && (<><dt>Edición</dt><dd>{libro.edicion}ª</dd></>)}
               {libro.paginas && (<><dt>Páginas</dt><dd>{libro.paginas}</dd></>)}
               <dt>Idioma</dt><dd>{libro.idioma}</dd>
               <dt>Formato</dt><dd>{libro.formato}</dd>

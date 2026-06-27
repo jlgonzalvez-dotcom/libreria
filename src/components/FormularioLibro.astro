@@ -27,6 +27,7 @@ const v = {
   anio: libro?.anio ?? '',
   idioma: libro?.idioma ?? 'Español',
   editorial: libro?.editorial ?? '',
+  edicion: libro?.edicion ?? '',
   isbn: libro?.isbn ?? '',
   paginas: libro?.paginas ?? '',
   estado: libro?.estado ?? 'pendiente',
@@ -140,9 +141,15 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
       </div>
     </div>
 
-    <div class="campo">
-      <label for="editorial">Editorial</label>
-      <input id="editorial" name="editorial" type="text" value={v.editorial} />
+    <div class="fila-2">
+      <div class="campo">
+        <label for="editorial">Editorial</label>
+        <input id="editorial" name="editorial" type="text" value={v.editorial} />
+      </div>
+      <div class="campo">
+        <label for="edicion">Edición (nº)</label>
+        <input id="edicion" name="edicion" type="number" value={v.edicion} min="1" step="1" placeholder="1, 2, 3…" />
+      </div>
     </div>
   </fieldset>
 

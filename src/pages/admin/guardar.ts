@@ -46,6 +46,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     anio: numero(datos.get('anio')),
     idioma: texto(datos.get('idioma')) ?? 'Español',
     editorial: texto(datos.get('editorial')),
+    edicion: numero(datos.get('edicion')),
     // El cuadro "ISBN o título" solo se guarda como ISBN si lo es de verdad.
     isbn: esIsbn(String(datos.get('isbn') ?? '').trim()),
     paginas: numero(datos.get('paginas')),
