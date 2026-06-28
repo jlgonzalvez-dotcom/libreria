@@ -1,5 +1,5 @@
 ---
-import type { Libro } from '../lib/libros';
+import type { Libro, SugerenciasFormulario } from '../lib/libros';
 import {
   ESTADOS,
   FORMATOS,
@@ -10,11 +10,25 @@ import {
 
 interface Props {
   libro?: Libro | null;
-  categoriasExistentes?: string[];
+  sugerencias?: SugerenciasFormulario;
   error?: string;
 }
 
-const { libro = null, categoriasExistentes = [], error = '' } = Astro.props;
+const {
+  libro = null,
+  sugerencias = { categorias: [], autores: [], editoriales: [], libros: [] },
+  error = '',
+} = Astro.props;
+const categoriasExistentes = sugerencias.categorias;
+
+// Datos para el cliente: autocompletar autor/editorial y avisar de duplicados.
+// Excluimos el libro en edición de la lista de duplicados (no es su propio doble).
+const datosCliente = {
+  autores: sugerencias.autores,
+  editoriales: sugerencias.editoriales,
+  libros: sugerencias.libros.filter((l) => l.id !== libro?.id),
+};
+const datosClienteJson = JSON.stringify(datosCliente).replace(/</g, '\\u003c');
 
 // Valores actuales (vacíos al crear).
 const v = {
@@ -73,18 +87,26 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
 
     <div class="campo">
       <label for="titulo">Título *</label>
-      <input id="titulo" name="titulo" type="text" value={v.titulo} required />
+      <input id="titulo" name="titulo" type="text" value={v.titulo} required autocomplete="off" />
     </div>
 
     <div class="fila-2">
       <div class="campo">
         <label for="autor">Autor *</label>
-        <input id="autor" name="autor" type="text" value={v.autor} required />
+        <div class="typeahead-wrap" data-typeahead="autores">
+          <input id="autor" name="autor" type="text" value={v.autor} required autocomplete="off" />
+          <ul class="typeahead-lista" hidden></ul>
+        </div>
       </div>
       <div class="campo">
         <label for="autores_extra">Coautores</label>
         <input id="autores_extra" name="autores_extra" type="text" value={v.autores_extra} placeholder="separados por comas" />
       </div>
+    </div>
+
+    <div id="dup-aviso" class="dup-aviso" hidden>
+      <span class="dup-icono" aria-hidden="true">⚠️</span>
+      <span class="dup-texto"></span>
     </div>
   </fieldset>
 
@@ -144,7 +166,10 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
 
     <div class="campo">
       <label for="editorial">Editorial</label>
-      <input id="editorial" name="editorial" type="text" value={v.editorial} />
+      <div class="typeahead-wrap" data-typeahead="editoriales">
+        <input id="editorial" name="editorial" type="text" value={v.editorial} autocomplete="off" />
+        <ul class="typeahead-lista" hidden></ul>
+      </div>
     </div>
     <div class="fila-2">
       <div class="campo">
@@ -273,10 +298,23 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
   </div>
 </div>
 
+<script type="application/json" id="datos-cliente" is:inline set:html={datosClienteJson}></script>
+
 <script>
   import { validarIsbn } from '../lib/isbn';
+  import { detectarDuplicado, type LibroRef } from '../lib/similitud';
 
   const $ = (id: string) => document.getElementById(id);
+
+  // Datos inyectados desde el servidor: autores/editoriales para autocompletar y
+  // la colección (ligera) para avisar de repetidos.
+  const datos: { autores: string[]; editoriales: string[]; libros: LibroRef[] } = (() => {
+    try {
+      return JSON.parse($('datos-cliente')?.textContent || '{}');
+    } catch {
+      return { autores: [], editoriales: [], libros: [] };
+    }
+  })();
 
   // ── Portada: previsualización + subida ─────────────────────────────────────
   const portadaInput = $('portada') as HTMLInputElement | null;
@@ -420,6 +458,7 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
     set('sinopsis', data.sinopsis);
     if (data.isbn && isbnInput && !isbnInput.value) isbnInput.value = data.isbn;
     if (portadaInput) actualizarPreview(portadaInput.value.trim());
+    evaluarDuplicado(); // los datos recién traídos pueden coincidir con otro libro
   }
 
   async function autocompletar() {
@@ -650,5 +689,123 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
   });
   catOtra?.addEventListener('input', () => {
     if (catHidden) catHidden.value = catOtra.value.trim();
+  });
+
+  // ── Utilidades ─────────────────────────────────────────────────────────────
+  const quitarAcentos = (s: string) =>
+    s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+  function escapeHtml(s: string): string {
+    return String(s).replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+  }
+
+  function debounce<T extends (...a: any[]) => void>(fn: T, ms: number) {
+    let t: ReturnType<typeof setTimeout>;
+    return (...args: Parameters<T>) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  }
+
+  // ── Autocompletar autor / editorial desde lo ya existente ──────────────────
+  // Desplegable propio (no <datalist>): al teclear, ofrece las formas ya usadas
+  // en la colección, para no escribir el mismo autor de dos maneras distintas.
+  function montarTypeahead(wrap: HTMLElement) {
+    const input = wrap.querySelector('input') as HTMLInputElement | null;
+    const lista = wrap.querySelector('.typeahead-lista') as HTMLUListElement | null;
+    if (!input || !lista) return;
+    const clave = wrap.getAttribute('data-typeahead');
+    const fuente: string[] = clave === 'editoriales' ? datos.editoriales : datos.autores;
+    if (!fuente || fuente.length === 0) return;
+    let activo = -1;
+
+    const cerrar = () => { lista.hidden = true; lista.innerHTML = ''; activo = -1; };
+    const items = () => Array.from(lista.querySelectorAll('li'));
+
+    function pintar() {
+      const q = quitarAcentos(input!.value);
+      if (q.length < 1) return cerrar();
+      const hits = fuente
+        .filter((o) => { const n = quitarAcentos(o); return n.includes(q) && n !== q; })
+        .slice(0, 8);
+      if (hits.length === 0) return cerrar();
+      lista!.innerHTML = hits
+        .map((o) => `<li role="option" data-val="${escapeHtml(o)}">${escapeHtml(o)}</li>`)
+        .join('');
+      lista!.hidden = false;
+      activo = -1;
+    }
+
+    function marcar(i: number) {
+      const lis = items();
+      if (lis.length === 0) return;
+      activo = (i + lis.length) % lis.length;
+      lis.forEach((li, j) => li.classList.toggle('activo', j === activo));
+    }
+
+    function elegir(valor: string) {
+      input!.value = valor;
+      cerrar();
+      input!.dispatchEvent(new Event('input', { bubbles: true })); // re-evaluar duplicados
+      input!.focus();
+    }
+
+    input.addEventListener('input', () => { activo = -1; pintar(); });
+    input.addEventListener('focus', () => { if (input.value) pintar(); });
+    input.addEventListener('blur', () => { setTimeout(cerrar, 120); });
+    input.addEventListener('keydown', (e) => {
+      if (lista.hidden) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); marcar(activo + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); marcar(activo - 1); }
+      else if (e.key === 'Enter' && activo >= 0) {
+        const li = items()[activo];
+        if (li) { e.preventDefault(); elegir(li.getAttribute('data-val') || ''); }
+      } else if (e.key === 'Escape') { cerrar(); }
+    });
+    // mousedown (no click): se registra antes de que el blur del input cierre la lista.
+    lista.addEventListener('mousedown', (e) => {
+      const li = (e.target as HTMLElement).closest('li');
+      if (!li) return;
+      e.preventDefault();
+      elegir(li.getAttribute('data-val') || '');
+    });
+  }
+
+  document.querySelectorAll('.typeahead-wrap').forEach((w) => montarTypeahead(w as HTMLElement));
+
+  // ── Aviso de libro repetido / parecido ─────────────────────────────────────
+  const tituloEl = $('titulo') as HTMLInputElement | null;
+  const autorEl = $('autor') as HTMLInputElement | null;
+  const dupAviso = $('dup-aviso');
+  const dupTexto = dupAviso?.querySelector('.dup-texto') as HTMLElement | null;
+  let dupAlto = false; // ¿la última coincidencia es de nivel "alto"?
+
+  function evaluarDuplicado() {
+    if (!dupAviso || !dupTexto) return;
+    const m = detectarDuplicado(
+      { titulo: tituloEl?.value || '', autor: autorEl?.value || '', isbn: isbnInput?.value || '' },
+      datos.libros,
+    );
+    dupAlto = m?.nivel === 'alto';
+    if (!m) { dupAviso.hidden = true; return; }
+    const cabecera = m.nivel === 'alto' ? 'Ya tienes este libro' : 'Quizá ya tienes este libro';
+    dupTexto.innerHTML =
+      `${cabecera}: «<a href="/admin/${m.libro.id}">${escapeHtml(m.libro.titulo || 'sin título')}</a>» ${escapeHtml(m.motivo)}.`;
+    dupAviso.classList.toggle('alto', m.nivel === 'alto');
+    dupAviso.hidden = false;
+  }
+
+  const reEvaluar = debounce(evaluarDuplicado, 250);
+  tituloEl?.addEventListener('input', reEvaluar);
+  autorEl?.addEventListener('input', reEvaluar);
+  isbnInput?.addEventListener('input', reEvaluar);
+  evaluarDuplicado(); // comprobar al cargar (p. ej. al editar)
+
+  // Al guardar, si la coincidencia es fuerte (mismo ISBN, o mismo título y
+  // autor), pedir confirmación. Es solo un seguro: nunca bloquea de verdad.
+  const form = document.querySelector('.form-libro') as HTMLFormElement | null;
+  form?.addEventListener('submit', (e) => {
+    evaluarDuplicado();
+    if (dupAlto && !confirm('Parece que este libro ya está en tu colección.\n\n¿Quieres añadirlo de todas formas?')) {
+      e.preventDefault();
+    }
   });
 </script>

@@ -53,6 +53,36 @@ export async function generarSlugUnico(titulo: string, excluirId?: string): Prom
   }
 }
 
+// ─── Sugerencias para el formulario (autocompletar + aviso de duplicados) ─────
+export interface SugerenciasFormulario {
+  categorias: string[];
+  autores: string[];
+  editoriales: string[];
+  /** Versión ligera de cada libro, para detectar duplicados en el cliente. */
+  libros: { id: string; titulo: string; autor: string; isbn: string | null }[];
+}
+
+/** A partir de la colección, deriva las listas que alimentan el formulario:
+ *  categorías, autores (principal + coautores) y editoriales ya usados (únicos,
+ *  ordenados), y una versión ligera de cada libro para avisar de repetidos. */
+export function sugerenciasDesde(libros: Libro[]): SugerenciasFormulario {
+  const ordenar = (xs: Iterable<string>) =>
+    [...new Set(xs)].filter((x) => x && x.trim() !== '').sort((a, b) => a.localeCompare(b, 'es'));
+
+  const autores: string[] = [];
+  for (const l of libros) {
+    if (l.autor) autores.push(l.autor);
+    for (const co of l.autores_extra ?? []) autores.push(co);
+  }
+
+  return {
+    categorias: ordenar(libros.map((l) => l.categoria ?? '')),
+    autores: ordenar(autores),
+    editoriales: ordenar(libros.map((l) => l.editorial ?? '')),
+    libros: libros.map((l) => ({ id: l.id, titulo: l.titulo, autor: l.autor, isbn: l.isbn })),
+  };
+}
+
 // ─── Lecturas ────────────────────────────────────────────────────────────────
 export async function listarLibros(): Promise<Libro[]> {
   const { data, error } = await supabase

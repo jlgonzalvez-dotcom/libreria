@@ -534,6 +534,34 @@ a:hover { color: var(--acento-osc); }
 #autocompletar-msg { display: block; margin-top: 8px; min-height: 1em; }
 .form-acciones { display: flex; gap: 12px; align-items: center; margin-top: 8px; }
 
+/* Autocompletar autor/editorial: desplegable propio anclado al input */
+.typeahead-wrap { position: relative; }
+.typeahead-lista {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 30; margin: 3px 0 0;
+  list-style: none; padding: 4px; max-height: 240px; overflow-y: auto;
+  background: var(--crema); border: 1px solid var(--linea-fuerte);
+  border-radius: var(--radio-sm); box-shadow: var(--sombra);
+}
+.typeahead-lista[hidden] { display: none; }
+.typeahead-lista li {
+  padding: 8px 11px; border-radius: 6px; cursor: pointer;
+  font-size: 0.92rem; color: var(--tinta); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.typeahead-lista li:hover, .typeahead-lista li.activo { background: var(--papel-2); }
+
+/* Aviso de libro repetido / parecido */
+.dup-aviso {
+  display: flex; align-items: flex-start; gap: 9px; margin-top: 4px;
+  padding: 11px 14px; border: 1px solid var(--linea-fuerte);
+  border-left: 3px solid var(--oro); border-radius: var(--radio-sm);
+  background: var(--papel-2); color: var(--tinta-suave); font-size: 0.88rem;
+}
+.dup-aviso.alto { border-left-color: var(--acento); }
+.dup-aviso[hidden] { display: none; }
+.dup-aviso .dup-icono { flex-shrink: 0; line-height: 1.4; }
+.dup-aviso a { color: var(--acento); font-weight: 600; text-decoration: underline; }
+
 /* Portada: preview + subida */
 .portada-editor { display: flex; gap: 18px; align-items: flex-start; }
 .portada-preview {

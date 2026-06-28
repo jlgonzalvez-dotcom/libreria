@@ -1,16 +1,15 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import FormularioLibro from '../../components/FormularioLibro.astro';
-import { listarLibros } from '../../lib/libros';
+import { listarLibros, sugerenciasDesde } from '../../lib/libros';
 
-const libros = await listarLibros();
-const categoriasExistentes = [...new Set(libros.map((l) => l.categoria))];
+const sugerencias = sugerenciasDesde(await listarLibros());
 ---
 
 <AdminLayout titulo="Nuevo libro · Admin">
   <section class="contenedor admin-form">
     <a href="/admin" class="volver">← Volver al listado</a>
     <h1>Añadir libro</h1>
-    <FormularioLibro categoriasExistentes={categoriasExistentes} />
+    <FormularioLibro sugerencias={sugerencias} />
   </section>
 </AdminLayout>
