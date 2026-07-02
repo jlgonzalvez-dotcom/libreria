@@ -61,9 +61,10 @@ ${material}
 Reglas:
 - Entre 60 y 100 palabras, en español neutro, tono sobrio de contracubierta de una librería seria. Sin frases de marketing ("imprescindible", "obra maestra"…), sin desvelar el final, sin opiniones.
 - Si hay material de las fuentes: básate SOLO en él (tradúcelo si hace falta, límpialo y recórtalo). No añadas datos que no estén en el material.
-- Si NO hay material: redacta solo si conoces esta obra concreta con seguridad. Tienes prohibido inventar trama, premios, fechas o datos.
+- Si NO hay material, pregúntate primero: ¿identificas esta obra concreta? Muchas lo son de sobra (clásicos, superventas internacionales, manuales y obras de referencia célebres): en ese caso redacta con lo que sabes con certeza de la obra (tema, planteamiento, contexto), quedándote en lo general antes que arriesgar detalles. No la confundas con otra obra del mismo autor.
+- Tienes prohibido inventar trama, premios, fechas o datos concretos de los que no estés seguro.
 - Si es una publicación periódica o un anuario (p. ej. un anuario de ajedrez), describe en qué consiste la serie y qué recoge cada entrega.
-- Si no conoces la obra o tienes dudas, responde exactamente NO_SE.
+- Responde exactamente NO_SE únicamente si de verdad no identificas la obra o apenas sabes nada de ella.
 - Responde SOLO con la sinopsis (o NO_SE), sin comillas, sin título y sin preámbulos.`;
 }
 
