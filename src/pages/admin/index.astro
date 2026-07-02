@@ -1,9 +1,27 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { listarLibros } from '../../lib/libros';
+import { supabase } from '../../lib/supabase';
 
 const libros = await listarLibros();
 const total = libros.length;
+
+// ── Resumen de un vistazo (pedido por JLG: "estadísticas automatizadas") ─────
+// Visitas de los últimos 7 días (personas distintas + páginas vistas).
+const hace7 = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+const { data: vis } = await supabase
+  .from('visitas')
+  .select('visitante')
+  .gte('dia', hace7)
+  .limit(20000);
+const vistas7 = (vis ?? []).length;
+const personas7 = new Set((vis ?? []).map((v) => v.visitante)).size;
+
+// Pulso de la colección.
+const hace30 = Date.now() - 30 * 86400000;
+const nuevosMes = libros.filter((l) => new Date(l.created_at).getTime() >= hace30).length;
+const borradoresPendientes = libros.filter((l) => l.sinopsis_borrador && l.sinopsis_borrador.trim() !== '').length;
+const sinUbicacion = libros.filter((l) => !l.ubicacion || l.ubicacion.trim() === '').length;
 
 // Posible mensaje de confirmación tras guardar/borrar (?ok=creado|editado|borrado).
 const ok = Astro.url.searchParams.get('ok');
@@ -26,6 +44,25 @@ const aviso = ok ? mensajes[ok] : '';
     </div>
 
     {aviso && <p class="aviso ok">{aviso}</p>}
+
+    <div class="vis-cifras resumen">
+      <a class="vis-cifra" href="/admin/visitas">
+        <strong>{personas7}</strong>
+        <span>{personas7 === 1 ? 'persona' : 'personas'} esta semana ({vistas7} vistas)</span>
+      </a>
+      <div class="vis-cifra">
+        <strong>{total}</strong>
+        <span>libros{nuevosMes > 0 ? ` · +${nuevosMes} este mes` : ''}</span>
+      </div>
+      <a class="vis-cifra" href="/admin/sinopsis">
+        <strong>{borradoresPendientes}</strong>
+        <span>{borradoresPendientes === 1 ? 'sinopsis por revisar' : 'sinopsis por revisar'}</span>
+      </a>
+      <a class="vis-cifra" href="/admin/ubicaciones">
+        <strong>{sinUbicacion}</strong>
+        <span>sin ubicación</span>
+      </a>
+    </div>
 
     {
       total === 0 ? (

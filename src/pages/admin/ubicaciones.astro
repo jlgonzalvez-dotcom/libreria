@@ -1,0 +1,156 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { listarLibros } from '../../lib/libros';
+
+const libros = await listarLibros();
+const total = libros.length;
+const sinUbicacion = libros.filter((l) => !l.ubicacion || l.ubicacion.trim() === '').length;
+
+// Sitios ya usados (para elegirlos con un clic). Texto libre: conviven
+// "Salón — estantería A" y "Caja 3" sin problema.
+const sitios = [...new Set(libros.map((l) => l.ubicacion?.trim()).filter(Boolean))] as string[];
+sitios.sort((a, b) => a.localeCompare(b, 'es'));
+---
+
+<AdminLayout titulo="Ubicaciones · Admin">
+  <section class="contenedor admin">
+    <div class="admin-top">
+      <div>
+        <h1>Ubicaciones</h1>
+        <p class="admin-sub" id="ubi-resumen">{total} libros · {sinUbicacion} sin ubicación.</p>
+      </div>
+      <a href="/admin" class="btn-secundario">← Volver al listado</a>
+    </div>
+
+    <p class="sino-explica">
+      <strong>Modo estantería:</strong> escribe (o elige) el sitio donde estás — un mueble
+      («Salón — estantería A») o una caja («Caja 3») — y ve pulsando «Poner aquí» en los
+      libros que tengas delante. Cada clic se guarda al momento. La ubicación es un dato
+      interno: no se muestra en la web pública.
+    </p>
+
+    <div class="ubi-sitio">
+      <label for="ubi-sitio-input">Sitio en el que estás</label>
+      <input id="ubi-sitio-input" type="text" placeholder='p. ej. «Salón — estantería A» o «Caja 3»' autocomplete="off" />
+      {sitios.length > 0 && (
+        <div class="ubi-chips">
+          {sitios.map((s) => <button type="button" class="chip ubi-chip" data-sitio={s}>{s}</button>)}
+        </div>
+      )}
+      <small class="ayuda" id="ubi-contador">Escribe un sitio para empezar.</small>
+    </div>
+
+    <div class="admin-buscar" style="margin: 18px 0 12px">
+      <input id="ubi-buscador" class="buscador" type="search" placeholder="Filtrar libros por título, autor o ubicación…" autocomplete="off" />
+    </div>
+
+    <div class="ubi-lista">
+      {libros.map((l) => (
+        <div
+          class="ubi-fila"
+          data-id={l.id}
+          data-ubicacion={l.ubicacion?.trim() ?? ''}
+          data-base={`${l.titulo} ${l.autor}`.toLowerCase()}
+          data-busqueda={`${l.titulo} ${l.autor} ${l.ubicacion ?? ''}`.toLowerCase()}
+        >
+          <div class="ubi-info">
+            <strong>{l.titulo}</strong>
+            <em>{l.autor}</em>
+          </div>
+          <span class="badge ubi-actual" hidden={!l.ubicacion?.trim()}>{l.ubicacion}</span>
+          <button type="button" class="btn-secundario ubi-btn" disabled>Poner aquí</button>
+        </div>
+      ))}
+    </div>
+  </section>
+</AdminLayout>
+
+<script>
+  const $ = (id: string) => document.getElementById(id);
+  const sitioInput = $('ubi-sitio-input') as HTMLInputElement | null;
+  const buscador = $('ubi-buscador') as HTMLInputElement | null;
+  const contador = $('ubi-contador');
+  const resumen = $('ubi-resumen');
+  const filas = Array.from(document.querySelectorAll<HTMLElement>('.ubi-fila'));
+  const totalLibros = filas.length;
+
+  const sitioActual = () => (sitioInput?.value ?? '').trim();
+
+  function pintarFila(fila: HTMLElement) {
+    const sitio = sitioActual();
+    const enSitio = sitio !== '' && fila.dataset.ubicacion === sitio;
+    const btn = fila.querySelector('.ubi-btn') as HTMLButtonElement | null;
+    const badge = fila.querySelector('.ubi-actual') as HTMLElement | null;
+    fila.classList.toggle('en-sitio', enSitio);
+    if (btn) {
+      btn.disabled = sitio === '';
+      btn.textContent = enSitio ? '✓ Aquí — quitar' : 'Poner aquí';
+    }
+    if (badge) {
+      const u = fila.dataset.ubicacion ?? '';
+      badge.textContent = u;
+      badge.hidden = u === '';
+    }
+  }
+
+  function pintarTodo() {
+    filas.forEach(pintarFila);
+    const sitio = sitioActual();
+    if (contador) {
+      if (sitio === '') {
+        contador.textContent = 'Escribe un sitio para empezar.';
+      } else {
+        const n = filas.filter((f) => f.dataset.ubicacion === sitio).length;
+        contador.textContent = `${n} ${n === 1 ? 'libro' : 'libros'} en «${sitio}».`;
+      }
+    }
+    if (resumen) {
+      const sin = filas.filter((f) => (f.dataset.ubicacion ?? '') === '').length;
+      resumen.textContent = `${totalLibros} libros · ${sin} sin ubicación.`;
+    }
+  }
+
+  sitioInput?.addEventListener('input', pintarTodo);
+
+  document.querySelectorAll<HTMLElement>('.ubi-chip').forEach((chip) =>
+    chip.addEventListener('click', () => {
+      if (sitioInput) sitioInput.value = chip.dataset.sitio ?? '';
+      pintarTodo();
+    }),
+  );
+
+  buscador?.addEventListener('input', () => {
+    const q = buscador.value.trim().toLowerCase();
+    for (const f of filas) {
+      f.style.display = q === '' || (f.dataset.busqueda ?? '').includes(q) ? '' : 'none';
+    }
+  });
+
+  // Un clic = un guardado (sin botón de "guardar todo": no se pierde nada).
+  filas.forEach((fila) => {
+    const btn = fila.querySelector('.ubi-btn') as HTMLButtonElement | null;
+    btn?.addEventListener('click', async () => {
+      const sitio = sitioActual();
+      if (!sitio) return;
+      const nueva = fila.dataset.ubicacion === sitio ? '' : sitio;
+      btn.disabled = true;
+      btn.textContent = 'Guardando…';
+      try {
+        const res = await fetch('/admin/ubicar', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ id: fila.dataset.id, ubicacion: nueva }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Error');
+        fila.dataset.ubicacion = nueva;
+        fila.dataset.busqueda = `${fila.dataset.base ?? ''} ${nueva}`.toLowerCase();
+      } catch {
+        btn.textContent = 'Error — reintenta';
+      }
+      pintarTodo();
+    });
+  });
+
+  pintarTodo();
+</script>

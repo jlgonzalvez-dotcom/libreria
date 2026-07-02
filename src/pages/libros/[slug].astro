@@ -115,7 +115,7 @@ const jsonLd = {
               <dt>Formato</dt><dd>{libro.formato}</dd>
               {libro.valoracion != null && (<><dt>Valoración</dt><dd><span class="estrellas">{estrellas(libro.valoracion)}</span></dd></>)}
               {libro.isbn && (<><dt>ISBN</dt><dd>{libro.isbn}</dd></>)}
-              {libro.ubicacion && (<><dt>Ubicación</dt><dd>{libro.ubicacion}</dd></>)}
+              {/* La ubicación física es dato interno de inventario: solo en /admin. */}
               {libro.subcategorias.length > 0 && (
                 <><dt>Géneros</dt><dd>{libro.subcategorias.join(', ')}</dd></>
               )}
