@@ -111,6 +111,40 @@ export type Database = {
         }
         Relationships: []
       }
+      visitas: {
+        Row: {
+          ciudad: string | null
+          created_at: string
+          dia: string
+          id: number
+          pais: string | null
+          referente: string | null
+          region: string | null
+          ruta: string
+          visitante: string | null
+        }
+        Insert: {
+          ciudad?: string | null
+          created_at?: string
+          dia: string
+          pais?: string | null
+          referente?: string | null
+          region?: string | null
+          ruta: string
+          visitante?: string | null
+        }
+        Update: {
+          ciudad?: string | null
+          created_at?: string
+          dia?: string
+          pais?: string | null
+          referente?: string | null
+          region?: string | null
+          ruta?: string
+          visitante?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }

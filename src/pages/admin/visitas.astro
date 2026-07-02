@@ -1,0 +1,191 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { supabase } from '../../lib/supabase';
+
+// Ventana de análisis: los últimos 30 días (volumen pequeño → se agrega aquí).
+const DIAS = 30;
+const desde = new Date(Date.now() - (DIAS - 1) * 86400000).toISOString().slice(0, 10);
+const hoy = new Date().toISOString().slice(0, 10);
+
+const { data } = await supabase
+  .from('visitas')
+  .select('dia, ruta, pais, ciudad, referente, visitante')
+  .gte('dia', desde)
+  .limit(50000);
+const visitas = data ?? [];
+
+// ── Agregados ────────────────────────────────────────────────────────────────
+const displayNames = new Intl.DisplayNames(['es'], { type: 'region' });
+function nombrePais(codigo: string): string {
+  try { return displayNames.of(codigo) ?? codigo; } catch { return codigo; }
+}
+function banderaPais(codigo: string): string {
+  if (!/^[A-Z]{2}$/i.test(codigo)) return '';
+  return String.fromCodePoint(...[...codigo.toUpperCase()].map((c) => 127397 + c.charCodeAt(0)));
+}
+
+const personas = new Set(visitas.map((v) => v.visitante)).size;
+const deHoy = visitas.filter((v) => v.dia === hoy);
+const personasHoy = new Set(deHoy.map((v) => v.visitante)).size;
+
+// Serie diaria (30 columnas, en orden cronológico; días sin visitas a 0).
+const porDia = new Map<string, { vistas: number; personas: Set<string> }>();
+for (const v of visitas) {
+  const e = porDia.get(v.dia) ?? { vistas: 0, personas: new Set<string>() };
+  e.vistas++;
+  if (v.visitante) e.personas.add(v.visitante);
+  porDia.set(v.dia, e);
+}
+const serie = Array.from({ length: DIAS }, (_, i) => {
+  const d = new Date(Date.now() - (DIAS - 1 - i) * 86400000);
+  const clave = d.toISOString().slice(0, 10);
+  const e = porDia.get(clave);
+  return {
+    etiqueta: d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
+    vistas: e?.vistas ?? 0,
+    personas: e?.personas.size ?? 0,
+  };
+});
+const maxDia = Math.max(1, ...serie.map((s) => s.vistas));
+
+/** Agrupa contando personas distintas (o vistas) y devuelve el top N. */
+function top(
+  claveDe: (v: (typeof visitas)[number]) => string | null,
+  n = 10,
+): { nombre: string; n: number }[] {
+  const grupos = new Map<string, Set<string>>();
+  for (const v of visitas) {
+    const clave = claveDe(v);
+    if (!clave) continue;
+    if (!grupos.has(clave)) grupos.set(clave, new Set());
+    grupos.get(clave)!.add(v.visitante ?? String(Math.random()));
+  }
+  return [...grupos.entries()]
+    .map(([nombre, set]) => ({ nombre, n: set.size }))
+    .sort((a, b) => b.n - a.n)
+    .slice(0, n);
+}
+
+const topPaises = top((v) => (v.pais ? `${banderaPais(v.pais)} ${nombrePais(v.pais)}` : null));
+const topCiudades = top((v) => (v.ciudad ? `${v.ciudad}${v.pais ? ` (${nombrePais(v.pais)})` : ''}` : null));
+const topReferentes = top((v) => v.referente);
+
+// Páginas más vistas (aquí cuentan las vistas, no las personas).
+const rutas = new Map<string, number>();
+for (const v of visitas) rutas.set(v.ruta, (rutas.get(v.ruta) ?? 0) + 1);
+function nombreRuta(ruta: string): string {
+  if (ruta === '/') return 'Portada';
+  return ruta.replace(/^\/libros\//, '').replace(/\/$/, '').replace(/-/g, ' ');
+}
+const topRutas = [...rutas.entries()]
+  .map(([ruta, n]) => ({ nombre: nombreRuta(ruta), n }))
+  .sort((a, b) => b.n - a.n)
+  .slice(0, 10);
+
+const maxDe = (xs: { n: number }[]) => Math.max(1, ...xs.map((x) => x.n));
+---
+
+<AdminLayout titulo="Visitas · Admin">
+  <section class="contenedor admin">
+    <div class="admin-top">
+      <div>
+        <h1>Visitas</h1>
+        <p class="admin-sub">Últimos {DIAS} días · sin cookies ni datos personales (por eso no hace falta banner de aviso).</p>
+      </div>
+      <a href="/admin" class="btn-secundario">← Volver al listado</a>
+    </div>
+
+    {visitas.length === 0 ? (
+      <p class="vacio">
+        Aún no hay visitas registradas — se empiezan a contar desde que se publicó esta función.
+        Pásate por la <a href="/" target="_blank">web pública</a> y recarga: aparecerá tu propia visita.
+      </p>
+    ) : (
+      <>
+        <div class="vis-cifras">
+          <div class="vis-cifra"><strong>{personas}</strong><span>{personas === 1 ? 'persona' : 'personas'} en {DIAS} días</span></div>
+          <div class="vis-cifra"><strong>{visitas.length}</strong><span>páginas vistas</span></div>
+          <div class="vis-cifra"><strong>{personasHoy}</strong><span>{personasHoy === 1 ? 'persona' : 'personas'} hoy ({deHoy.length} vistas)</span></div>
+        </div>
+
+        <div class="vis-panel">
+          <h2>Visitas por día</h2>
+          <div class="vis-grafico" role="img" aria-label="Visitas diarias de los últimos 30 días">
+            {serie.map((s) => (
+              <div class="vis-col" title={`${s.etiqueta}: ${s.vistas} vistas, ${s.personas} personas`}>
+                <span class="vis-col-fill" style={`height:${Math.round((s.vistas / maxDia) * 100)}%`}></span>
+              </div>
+            ))}
+          </div>
+          <div class="vis-grafico-pie"><span>{serie[0].etiqueta}</span><span>hoy</span></div>
+        </div>
+
+        <div class="vis-grid">
+          <div class="vis-panel">
+            <h2>Países <small class="ayuda">(personas)</small></h2>
+            <ul class="barras">
+              {topPaises.map((p) => (
+                <li class="barra-fila">
+                  <span class="barra-nombre" title={p.nombre}>{p.nombre}</span>
+                  <span class="barra-track"><span class="barra-fill" style={`width:${Math.round((p.n / maxDe(topPaises)) * 100)}%`}></span></span>
+                  <span class="barra-num">{p.n}</span>
+                </li>
+              ))}
+              {topPaises.length === 0 && <li class="ayuda">Sin datos de país todavía (las visitas locales no lo traen).</li>}
+            </ul>
+          </div>
+          <div class="vis-panel">
+            <h2>Ciudades <small class="ayuda">(personas)</small></h2>
+            <ul class="barras">
+              {topCiudades.map((c) => (
+                <li class="barra-fila">
+                  <span class="barra-nombre" title={c.nombre}>{c.nombre}</span>
+                  <span class="barra-track"><span class="barra-fill" style={`width:${Math.round((c.n / maxDe(topCiudades)) * 100)}%`}></span></span>
+                  <span class="barra-num">{c.n}</span>
+                </li>
+              ))}
+              {topCiudades.length === 0 && <li class="ayuda">Sin datos de ciudad todavía.</li>}
+            </ul>
+          </div>
+        </div>
+
+        <div class="vis-grid">
+          <div class="vis-panel">
+            <h2>Páginas más vistas <small class="ayuda">(vistas)</small></h2>
+            <ul class="barras">
+              {topRutas.map((r) => (
+                <li class="barra-fila">
+                  <span class="barra-nombre" title={r.nombre}>{r.nombre}</span>
+                  <span class="barra-track"><span class="barra-fill" style={`width:${Math.round((r.n / maxDe(topRutas)) * 100)}%`}></span></span>
+                  <span class="barra-num">{r.n}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div class="vis-panel">
+            <h2>Vienen de <small class="ayuda">(personas)</small></h2>
+            {topReferentes.length === 0 ? (
+              <p class="ayuda">De momento, visitas directas (escriben la dirección o usan un enlace guardado).</p>
+            ) : (
+              <ul class="barras">
+                {topReferentes.map((r) => (
+                  <li class="barra-fila">
+                    <span class="barra-nombre" title={r.nombre}>{r.nombre}</span>
+                    <span class="barra-track"><span class="barra-fill" style={`width:${Math.round((r.n / maxDe(topReferentes)) * 100)}%`}></span></span>
+                    <span class="barra-num">{r.n}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <p class="ayuda vis-nota">
+          «Personas» cuenta dispositivos distintos por día (aproximado, sin identificar a nadie).
+          La ciudad la estima la red del visitante: a veces sale la capital de la provincia o la
+          sede de su operadora. Los robots y las vistas previas de WhatsApp no cuentan.
+        </p>
+      </>
+    )}
+  </section>
+</AdminLayout>

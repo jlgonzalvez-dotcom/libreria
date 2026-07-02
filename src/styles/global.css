@@ -537,6 +537,7 @@ a:hover { color: var(--acento-osc); }
 .tabla tbody tr:hover { background: rgba(176, 130, 63, 0.05); }
 .tabla tr:last-child td { border-bottom: none; }
 .td-titulo { font-family: var(--serif); font-weight: 600; font-size: 1.02rem; }
+.td-ubicacion { font-size: 0.86rem; color: var(--tinta-suave); }
 .td-titulo:hover { color: var(--acento); }
 .badge.dest { background: rgba(176, 130, 63, 0.12); color: var(--oro); border-color: rgba(176, 130, 63, 0.3); margin-left: 8px; }
 .acciones { display: flex; gap: 14px; align-items: center; white-space: nowrap; }
@@ -693,6 +694,39 @@ a:hover { color: var(--acento-osc); }
   .sino-pendientes ul { columns: 1; }
 }
 
+/* ── Admin: panel de visitas ──────────────────────────────────────────────── */
+.vis-cifras { display: flex; gap: 14px; flex-wrap: wrap; margin: 20px 0 6px; }
+.vis-cifra {
+  flex: 1; min-width: 170px; background: var(--crema); border: 1px solid var(--linea);
+  border-radius: var(--radio); padding: 18px 22px; box-shadow: var(--sombra-sm);
+}
+.vis-cifra strong {
+  display: block; font-family: var(--serif); font-size: 2.1rem; font-weight: 600;
+  color: var(--acento); line-height: 1;
+}
+.vis-cifra span {
+  display: block; margin-top: 7px; font-size: 0.78rem; color: var(--tinta-tenue);
+  text-transform: uppercase; letter-spacing: 0.07em;
+}
+.vis-panel {
+  background: var(--crema); border: 1px solid var(--linea); border-radius: var(--radio);
+  padding: 20px 24px; box-shadow: var(--sombra-sm); margin-top: 18px;
+}
+.vis-panel h2 { font-size: 1.15rem; margin-bottom: 14px; }
+.vis-panel h2::before { content: "✦"; color: var(--oro); font-size: 0.65rem; margin-right: 9px; vertical-align: middle; }
+.vis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.vis-grid .vis-panel { margin-top: 18px; }
+.vis-grafico { display: flex; align-items: flex-end; gap: 3px; height: 120px; }
+.vis-col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.vis-col-fill {
+  display: block; width: 100%; min-height: 2px; border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, var(--acento-claro), var(--acento));
+}
+.vis-col:hover .vis-col-fill { background: var(--oro); }
+.vis-grafico-pie { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.72rem; color: var(--tinta-tenue); }
+.vis-nota { display: block; margin: 20px 0 0; max-width: 72ch; }
+@media (max-width: 760px) { .vis-grid { grid-template-columns: 1fr; } }
+
 /* Botón "Redactar con IA" del formulario */
 .sinopsis-ia { display: flex; gap: 10px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
 .sinopsis-ia .btn-secundario:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -800,7 +834,8 @@ a:hover { color: var(--acento-osc); }
   .ficha dl { grid-template-columns: 128px 1fr; }
   .fila-2, .fila-3 { grid-template-columns: 1fr; }
   .admin-top { flex-direction: column; align-items: flex-start; }
-  .tabla th:nth-child(3), .tabla td:nth-child(3) { display: none; }
+  .tabla th:nth-child(3), .tabla td:nth-child(3),
+  .tabla th:nth-child(4), .tabla td:nth-child(4) { display: none; }
   .stat { padding: 0 20px; }
   .seccion-cab h2 { font-size: 1.4rem; }
 }

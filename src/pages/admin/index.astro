@@ -33,7 +33,7 @@ const aviso = ok ? mensajes[ok] : '';
       ) : (
         <>
         <div class="admin-buscar" style="margin: 4px 0 20px">
-          <input id="admin-buscador" class="buscador" type="search" placeholder="Buscar por título, autor o categoría…" autocomplete="off" />
+          <input id="admin-buscador" class="buscador" type="search" placeholder="Buscar por título, autor, categoría o ubicación…" autocomplete="off" />
         </div>
         <table class="tabla">
           <thead>
@@ -41,13 +41,14 @@ const aviso = ok ? mensajes[ok] : '';
               <th>Título</th>
               <th>Autor</th>
               <th>Categoría</th>
+              <th>Ubicación</th>
               <th>Estado</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {libros.map((libro) => (
-              <tr data-busqueda={`${libro.titulo} ${libro.autor} ${libro.categoria}`.toLowerCase()}>
+              <tr data-busqueda={`${libro.titulo} ${libro.autor} ${libro.categoria} ${libro.ubicacion ?? ''}`.toLowerCase()}>
                 <td>
                   <a href={`/admin/${libro.id}`} class="td-titulo">{libro.titulo}</a>
                   {libro.destacado && <span class="badge dest">★ destacado</span>}
@@ -55,6 +56,7 @@ const aviso = ok ? mensajes[ok] : '';
                 </td>
                 <td>{libro.autor}</td>
                 <td><span class="badge cat">{libro.categoria}</span></td>
+                <td class="td-ubicacion">{libro.ubicacion || <span class="ayuda">—</span>}</td>
                 <td><span class={`estado ${libro.estado}`}>{libro.estado}</span></td>
                 <td class="acciones">
                   <a href={`/admin/${libro.id}`} class="link-accion">Editar</a>
