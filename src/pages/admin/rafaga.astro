@@ -1,0 +1,431 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { listarLibros, CATEGORIAS_SUGERIDAS } from '../../lib/libros';
+
+const libros = await listarLibros();
+
+// Datos para el cliente:
+//  · La colección (ligera) para avisar de repetidos por ISBN.
+//  · Categoría más frecuente de cada autor (para proponerla sola).
+//  · Lista de categorías para el desplegable de cada fila.
+const coleccion = libros
+  .filter((l) => l.isbn)
+  .map((l) => ({ id: l.id, titulo: l.titulo, isbn: l.isbn as string }));
+
+const cuenta = new Map<string, Map<string, number>>();
+for (const l of libros) {
+  if (!l.autor || !l.categoria) continue;
+  if (!cuenta.has(l.autor)) cuenta.set(l.autor, new Map());
+  const c = cuenta.get(l.autor)!;
+  c.set(l.categoria, (c.get(l.categoria) ?? 0) + 1);
+}
+const autorCategoria: Record<string, string> = {};
+for (const [autor, cats] of cuenta) {
+  autorCategoria[autor] = [...cats.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+
+const categorias = [...new Set([...CATEGORIAS_SUGERIDAS, ...libros.map((l) => l.categoria)])]
+  .filter((c) => c && c.trim() !== '')
+  .sort((a, b) => a.localeCompare(b, 'es'));
+
+const datosCliente = { coleccion, autorCategoria, categorias };
+const datosClienteJson = JSON.stringify(datosCliente).replace(/</g, '\\u003c');
+---
+
+<AdminLayout titulo="Modo ráfaga · Admin">
+  <section class="contenedor admin">
+    <div class="admin-top">
+      <div>
+        <h1>Modo ráfaga</h1>
+        <p class="admin-sub">Escanea libro tras libro sin parar; los datos se buscan solos.</p>
+      </div>
+      <a href="/admin" class="btn-secundario">← Volver al listado</a>
+    </div>
+
+    <p class="sino-explica">
+      Pulsa <strong>«Escanear en cadena»</strong> y ve pasando códigos de barras: cada captura
+      suena (bip) y el libro se añade a la lista con sus datos. Si un libro ya está en tu
+      colección, se ofrece <strong>sumar un ejemplar</strong>. Al terminar, repasa la lista,
+      corrige lo que quieras y pulsa <strong>«Guardar todos»</strong>. Las sinopsis se generan
+      después, desde ✨ Sinopsis.
+    </p>
+
+    <div class="raf-controles">
+      <button type="button" id="raf-escanear" class="btn">📷 Escanear en cadena</button>
+      <div class="raf-manual">
+        <input id="raf-isbn" type="text" placeholder="…o escribe/pega ISBN (varios a la vez)" autocomplete="off" />
+        <button type="button" id="raf-anadir" class="btn-secundario">Añadir</button>
+      </div>
+    </div>
+    <small class="ayuda" id="raf-msg"></small>
+
+    <div class="raf-lista" id="raf-lista"></div>
+
+    <div class="raf-barra" id="raf-barra" hidden>
+      <span id="raf-resumen"></span>
+      <button type="button" id="raf-guardar" class="btn">Guardar todos</button>
+    </div>
+  </section>
+</AdminLayout>
+
+<div id="raf-modal" class="escaner-modal" hidden>
+  <div class="escaner-caja">
+    <p class="escaner-titulo">Escaneo en cadena</p>
+    <video id="raf-video" class="escaner-video" autoplay muted playsinline></video>
+    <p id="raf-modal-msg" class="ayuda">Iniciando cámara…</p>
+    <p class="raf-modal-cifra"><strong id="raf-capturados">0</strong> capturados</p>
+    <button type="button" id="raf-terminar" class="btn">Terminar</button>
+  </div>
+</div>
+
+<script type="application/json" id="raf-datos" is:inline set:html={datosClienteJson}></script>
+
+<script>
+  import { validarIsbn, mismoLibroIsbn } from '../../lib/isbn';
+
+  const $ = (id: string) => document.getElementById(id);
+
+  const datos: {
+    coleccion: { id: string; titulo: string; isbn: string }[];
+    autorCategoria: Record<string, string>;
+    categorias: string[];
+  } = (() => {
+    try { return JSON.parse($('raf-datos')?.textContent || '{}'); }
+    catch { return { coleccion: [], autorCategoria: {}, categorias: [] }; }
+  })();
+
+  type Item = {
+    isbn: string;
+    tipo: 'nuevo' | 'duplicado';
+    estado: 'buscando' | 'listo' | 'sin-datos' | 'guardado' | 'error';
+    fila: HTMLElement;
+    datos: any;      // lo traído por las fuentes
+    dupId?: string;  // si es duplicado: id del libro existente
+  };
+  const items: Item[] = [];
+
+  const lista = $('raf-lista');
+  const barra = $('raf-barra');
+  const resumen = $('raf-resumen');
+  const msg = $('raf-msg');
+  const btnGuardar = $('raf-guardar') as HTMLButtonElement | null;
+
+  // ── Bip de captura (WebAudio, sin archivos) ────────────────────────────────
+  let audioCtx: AudioContext | null = null;
+  function bip(frecuencia = 880) {
+    try {
+      audioCtx = audioCtx ?? new AudioContext();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.frequency.value = frecuencia;
+      gain.gain.value = 0.08;
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.09);
+    } catch { /* sin sonido, no pasa nada */ }
+  }
+
+  function actualizarBarra() {
+    const nuevos = items.filter((i) => i.tipo === 'nuevo' && i.estado !== 'guardado').length;
+    const ejemplares = items.filter((i) => i.tipo === 'duplicado' && i.estado !== 'guardado' && marcadoEjemplar(i)).length;
+    if (barra) barra.hidden = nuevos + ejemplares === 0;
+    if (resumen) {
+      const partes = [];
+      if (nuevos) partes.push(`${nuevos} ${nuevos === 1 ? 'libro nuevo' : 'libros nuevos'}`);
+      if (ejemplares) partes.push(`${ejemplares} ${ejemplares === 1 ? 'ejemplar a sumar' : 'ejemplares a sumar'}`);
+      resumen.textContent = partes.join(' · ');
+    }
+  }
+
+  function marcadoEjemplar(item: Item): boolean {
+    const check = item.fila.querySelector('.raf-ejemplar') as HTMLInputElement | null;
+    return Boolean(check?.checked);
+  }
+
+  function quitarItem(item: Item) {
+    const i = items.indexOf(item);
+    if (i >= 0) items.splice(i, 1);
+    item.fila.remove();
+    actualizarBarra();
+  }
+
+  function opcionesCategoria(seleccionada: string): string {
+    const opciones = ['<option value="">Sin categoría</option>'];
+    for (const c of datos.categorias) {
+      const sel = c === seleccionada ? ' selected' : '';
+      opciones.push(`<option value="${c.replace(/"/g, '&quot;')}"${sel}>${c}</option>`);
+    }
+    return opciones.join('');
+  }
+
+  function crearFilaNuevo(isbn: string): Item {
+    const fila = document.createElement('div');
+    fila.className = 'raf-fila';
+    fila.innerHTML = `
+      <div class="raf-thumb"><span>?</span></div>
+      <div class="raf-campos">
+        <div class="raf-inputs">
+          <input class="raf-titulo" type="text" placeholder="Título *" />
+          <input class="raf-autor" type="text" placeholder="Autor *" />
+          <select class="raf-cat">${opcionesCategoria('')}</select>
+        </div>
+        <small class="raf-meta">ISBN ${isbn}</small>
+        <small class="raf-estado">Buscando datos…</small>
+      </div>
+      <button type="button" class="link-accion borrar raf-quitar">Quitar</button>`;
+    lista?.prepend(fila);
+    const item: Item = { isbn, tipo: 'nuevo', estado: 'buscando', fila, datos: {} };
+    fila.querySelector('.raf-quitar')?.addEventListener('click', () => quitarItem(item));
+    items.push(item);
+    return item;
+  }
+
+  function crearFilaDuplicado(isbn: string, dup: { id: string; titulo: string }): Item {
+    const fila = document.createElement('div');
+    fila.className = 'raf-fila duplicado';
+    fila.innerHTML = `
+      <div class="raf-thumb"><span>≡</span></div>
+      <div class="raf-campos">
+        <strong class="raf-dup-titulo"></strong>
+        <small class="raf-meta">ISBN ${isbn} · ya está en tu colección</small>
+        <label class="check raf-check"><input type="checkbox" class="raf-ejemplar" checked /> Sumar 1 ejemplar</label>
+      </div>
+      <button type="button" class="link-accion borrar raf-quitar">Quitar</button>`;
+    (fila.querySelector('.raf-dup-titulo') as HTMLElement).textContent = `Ya lo tienes: «${dup.titulo}»`;
+    lista?.prepend(fila);
+    const item: Item = { isbn, tipo: 'duplicado', estado: 'listo', fila, datos: {}, dupId: dup.id };
+    fila.querySelector('.raf-quitar')?.addEventListener('click', () => quitarItem(item));
+    fila.querySelector('.raf-ejemplar')?.addEventListener('change', actualizarBarra);
+    items.push(item);
+    return item;
+  }
+
+  function ponerEstado(item: Item, texto: string, alerta = false) {
+    const el = item.fila.querySelector('.raf-estado') as HTMLElement | null;
+    if (el) { el.textContent = texto; el.classList.toggle('alerta', alerta); }
+  }
+
+  async function buscarDatosDe(item: Item) {
+    try {
+      const res = await fetch(`/api/autocompletar?q=${encodeURIComponent(item.isbn)}`);
+      const data = await res.json();
+      if (!res.ok || !data.encontrado) {
+        item.estado = 'sin-datos';
+        ponerEstado(item, 'No está en las fuentes: escribe el título y el autor a mano.', true);
+        return;
+      }
+      item.datos = data;
+      const titulo = item.fila.querySelector('.raf-titulo') as HTMLInputElement | null;
+      const autor = item.fila.querySelector('.raf-autor') as HTMLInputElement | null;
+      const cat = item.fila.querySelector('.raf-cat') as HTMLSelectElement | null;
+      if (titulo && !titulo.value && data.titulo) titulo.value = data.titulo;
+      if (autor && !autor.value && data.autor) autor.value = data.autor;
+      // Categoría propuesta: la más frecuente de ese autor en tu colección.
+      const propuesta = data.autor ? datos.autorCategoria[data.autor] : undefined;
+      if (cat && propuesta) cat.value = propuesta;
+      if (data.portada) {
+        const thumb = item.fila.querySelector('.raf-thumb');
+        if (thumb) thumb.innerHTML = `<img src="${data.portada}" alt="" loading="lazy" />`;
+      }
+      const meta = item.fila.querySelector('.raf-meta') as HTMLElement | null;
+      if (meta) {
+        meta.textContent = ['ISBN ' + item.isbn, data.editorial, data.anio, `fuente: ${data.fuente}`]
+          .filter(Boolean).join(' · ');
+      }
+      item.estado = 'listo';
+      ponerEstado(item, propuesta ? `Listo · categoría propuesta: ${propuesta}` : 'Listo · elige categoría si quieres');
+    } catch {
+      item.estado = 'sin-datos';
+      ponerEstado(item, 'Error al buscar: revisa la conexión o complétalo a mano.', true);
+    }
+  }
+
+  // ── Añadir un ISBN (desde el escáner o a mano) ─────────────────────────────
+  function anadirIsbn(codigo: string): 'ok' | 'duplicado-lista' | 'invalido' | 'ya-en-coleccion' {
+    const code = codigo.trim();
+    if (validarIsbn(code) === 'invalido') return 'invalido';
+    if (items.some((i) => mismoLibroIsbn(i.isbn, code))) return 'duplicado-lista';
+    const dup = datos.coleccion.find((l) => mismoLibroIsbn(l.isbn, code));
+    if (dup) {
+      crearFilaDuplicado(code, dup);
+      actualizarBarra();
+      return 'ya-en-coleccion';
+    }
+    const item = crearFilaNuevo(code);
+    buscarDatosDe(item).then(actualizarBarra);
+    actualizarBarra();
+    return 'ok';
+  }
+
+  // Entrada manual: admite varios ISBN pegados a la vez.
+  const inputManual = $('raf-isbn') as HTMLInputElement | null;
+  function anadirManual() {
+    const texto = inputManual?.value ?? '';
+    const codigos = texto.match(/[\dXx][\dXx-]{8,16}/g) ?? [];
+    if (codigos.length === 0) {
+      if (msg) msg.textContent = 'No veo ningún ISBN ahí. Escribe los 10 o 13 dígitos.';
+      return;
+    }
+    let invalidos = 0;
+    for (const c of codigos) if (anadirIsbn(c) === 'invalido') invalidos++;
+    if (inputManual) inputManual.value = '';
+    if (msg) msg.textContent = invalidos ? `⚠️ ${invalidos} con dígito de control incorrecto (no añadidos).` : '';
+  }
+  $('raf-anadir')?.addEventListener('click', anadirManual);
+  inputManual?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); anadirManual(); } });
+
+  // ── Escáner continuo (la cámara no se cierra entre libros) ────────────────
+  const modal = $('raf-modal');
+  const video = $('raf-video') as HTMLVideoElement | null;
+  const modalMsg = $('raf-modal-msg');
+  const capturados = $('raf-capturados');
+  let stream: MediaStream | null = null;
+  let controles: { stop: () => void } | null = null;
+  let nCapturados = 0;
+  const vistosRecientes = new Map<string, number>(); // código → timestamp
+
+  function cerrarEscaner() {
+    try { controles?.stop(); } catch { /* noop */ }
+    controles = null;
+    stream?.getTracks().forEach((t) => t.stop());
+    stream = null;
+    if (video) video.srcObject = null;
+    if (modal) modal.hidden = true;
+  }
+  $('raf-terminar')?.addEventListener('click', cerrarEscaner);
+
+  $('raf-escanear')?.addEventListener('click', async () => {
+    if (!modal || !video) return;
+    modal.hidden = false;
+    nCapturados = 0;
+    if (capturados) capturados.textContent = '0';
+    if (modalMsg) modalMsg.textContent = 'Iniciando cámara…';
+    try {
+      const restriccion = { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } };
+      try { stream = await navigator.mediaDevices.getUserMedia({ video: restriccion }); }
+      catch { stream = await navigator.mediaDevices.getUserMedia({ video: true }); }
+      video.srcObject = stream;
+      await video.play().catch(() => { /* algunos navegadores reproducen solos */ });
+
+      const [{ BrowserMultiFormatReader }, { DecodeHintType, BarcodeFormat }] = await Promise.all([
+        import('@zxing/browser'),
+        import('@zxing/library'),
+      ]);
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
+      ]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      const reader = new BrowserMultiFormatReader(hints);
+
+      // OJO: aquí NO se llama a controls.stop() — es la gracia de la ráfaga.
+      controles = await reader.decodeFromStream(stream, video, (result) => {
+        if (!result) return;
+        const code = result.getText();
+        const ahora = Date.now();
+        // El lector "ve" el mismo código muchas veces por segundo: ignorar relecturas.
+        if ((vistosRecientes.get(code) ?? 0) > ahora - 4000) return;
+        vistosRecientes.set(code, ahora);
+
+        const r = anadirIsbn(code);
+        if (r === 'ok') {
+          bip(880);
+          nCapturados++;
+          if (capturados) capturados.textContent = String(nCapturados);
+          if (modalMsg) modalMsg.textContent = `Capturado ${code} ✓ — siguiente libro.`;
+        } else if (r === 'ya-en-coleccion') {
+          bip(440);
+          nCapturados++;
+          if (capturados) capturados.textContent = String(nCapturados);
+          if (modalMsg) modalMsg.textContent = `${code}: ya en tu colección — marcado para sumar ejemplar.`;
+        } else if (r === 'duplicado-lista') {
+          if (modalMsg) modalMsg.textContent = `${code}: ya está en la lista de abajo.`;
+        } else {
+          bip(220);
+          if (modalMsg) modalMsg.textContent = `⚠️ ${code}: dígito de control incorrecto — vuelve a escanearlo.`;
+        }
+      });
+      if (modalMsg) modalMsg.textContent = 'Acerca el primer código de barras, con buena luz.';
+    } catch {
+      if (modalMsg) modalMsg.textContent = 'No se pudo abrir la cámara. Da permiso o escribe los ISBN a mano.';
+    }
+  });
+
+  // ── Guardar todos ──────────────────────────────────────────────────────────
+  btnGuardar?.addEventListener('click', async () => {
+    const nuevos: any[] = [];
+    const ejemplares: string[] = [];
+    const filasNuevos: Item[] = [];
+    let incompletos = 0;
+
+    for (const item of items) {
+      if (item.estado === 'guardado') continue;
+      if (item.tipo === 'duplicado') {
+        if (marcadoEjemplar(item) && item.dupId) ejemplares.push(item.dupId);
+        continue;
+      }
+      const titulo = (item.fila.querySelector('.raf-titulo') as HTMLInputElement | null)?.value.trim();
+      const autor = (item.fila.querySelector('.raf-autor') as HTMLInputElement | null)?.value.trim();
+      const categoria = (item.fila.querySelector('.raf-cat') as HTMLSelectElement | null)?.value ?? '';
+      if (!titulo || !autor) {
+        incompletos++;
+        ponerEstado(item, 'Faltan el título o el autor — este no se guardará.', true);
+        continue;
+      }
+      nuevos.push({
+        isbn: item.isbn,
+        titulo,
+        autor,
+        autores_extra: item.datos.autores_extra ?? [],
+        editorial: item.datos.editorial ?? null,
+        anio: item.datos.anio ?? null,
+        paginas: item.datos.paginas ?? null,
+        portada: item.datos.portada ?? null,
+        categoria,
+      });
+      filasNuevos.push(item);
+    }
+
+    if (nuevos.length + ejemplares.length === 0) {
+      if (msg) msg.textContent = incompletos ? 'Completa el título y el autor de las filas marcadas.' : 'No hay nada que guardar.';
+      return;
+    }
+
+    btnGuardar.disabled = true;
+    btnGuardar.textContent = 'Guardando…';
+    try {
+      const res = await fetch('/admin/rafaga-guardar', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ nuevos, ejemplares }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Error');
+
+      for (const item of items) {
+        if (item.estado === 'guardado') continue;
+        const esNuevoGuardado = filasNuevos.includes(item);
+        const esEjemplar = item.tipo === 'duplicado' && marcadoEjemplar(item) && item.dupId;
+        if (esNuevoGuardado || esEjemplar) {
+          item.estado = 'guardado';
+          item.fila.classList.add('guardado');
+          item.fila.querySelectorAll('input,select,button').forEach((el) => ((el as HTMLInputElement).disabled = true));
+          if (item.tipo === 'nuevo') ponerEstado(item, 'Guardado ✓');
+        }
+      }
+      if (msg) {
+        const partes = [];
+        if (data.creados) partes.push(`${data.creados} ${data.creados === 1 ? 'libro guardado' : 'libros guardados'}`);
+        if (data.sumados) partes.push(`${data.sumados} ${data.sumados === 1 ? 'ejemplar sumado' : 'ejemplares sumados'}`);
+        if (data.errores?.length) partes.push(`⚠️ fallaron: ${data.errores.join(', ')}`);
+        msg.innerHTML = `${partes.join(' · ')} — ahora puedes generar sus sinopsis en <a href="/admin/sinopsis">✨ Sinopsis</a>.`;
+      }
+    } catch {
+      if (msg) msg.textContent = 'No se pudo guardar. Vuelve a intentarlo.';
+    } finally {
+      btnGuardar.disabled = false;
+      btnGuardar.textContent = 'Guardar todos';
+      actualizarBarra();
+    }
+  });
+</script>

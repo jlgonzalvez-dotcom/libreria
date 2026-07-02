@@ -767,6 +767,56 @@ a.vis-cifra:hover { border-color: var(--acento-claro); transform: translateY(-2p
   .badge.ubi-actual { order: 3; }
 }
 
+/* ── Admin: modo ráfaga ───────────────────────────────────────────────────── */
+.raf-controles { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 16px 0 6px; }
+.raf-manual { display: flex; gap: 8px; flex: 1; min-width: 260px; max-width: 520px; }
+.raf-manual input {
+  flex: 1; padding: 10px 16px; font-size: 0.95rem; font-family: var(--sans);
+  border: 1px solid var(--linea-fuerte); border-radius: 999px; background: var(--crema); color: var(--tinta);
+}
+.raf-manual input:focus { outline: none; border-color: var(--oro); box-shadow: 0 0 0 3px rgba(176, 130, 63, 0.16); }
+.raf-lista { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.raf-fila {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: var(--crema); border: 1px solid var(--linea); border-radius: var(--radio);
+  padding: 12px 16px; box-shadow: var(--sombra-sm);
+}
+.raf-fila.duplicado { background: var(--papel-2); }
+.raf-fila.guardado { opacity: 0.55; }
+.raf-thumb {
+  flex: 0 0 48px; aspect-ratio: 3 / 4; border-radius: 4px; overflow: hidden;
+  background: linear-gradient(150deg, var(--acento) 0%, var(--acento-claro) 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255, 255, 255, 0.85); font-family: var(--serif); font-size: 1.2rem;
+}
+.raf-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.raf-campos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.raf-inputs { display: grid; grid-template-columns: 2fr 1.4fr 1fr; gap: 8px; }
+.raf-inputs input, .raf-inputs select {
+  padding: 8px 11px; font-size: 0.92rem; font-family: var(--sans);
+  border: 1px solid var(--linea-fuerte); border-radius: var(--radio-sm);
+  background: var(--papel); color: var(--tinta); width: 100%;
+}
+.raf-inputs input:focus, .raf-inputs select:focus { outline: none; border-color: var(--oro); box-shadow: 0 0 0 3px rgba(176, 130, 63, 0.14); }
+.raf-meta { color: var(--tinta-tenue); font-size: 0.78rem; }
+.raf-estado { color: var(--tinta-suave); font-size: 0.82rem; }
+.raf-estado.alerta { color: var(--acento); font-weight: 600; }
+.raf-dup-titulo { font-family: var(--serif); font-size: 0.98rem; }
+.raf-check { font-size: 0.9rem; margin: 0; }
+.raf-barra {
+  position: sticky; bottom: 12px; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  background: var(--crema); border: 1px solid var(--linea-fuerte); border-radius: var(--radio);
+  padding: 12px 18px; margin-top: 18px; box-shadow: var(--sombra);
+}
+.raf-modal-cifra { margin: 0 0 14px; color: var(--tinta-suave); font-size: 0.9rem; }
+.raf-modal-cifra strong { font-family: var(--serif); font-size: 1.5rem; color: var(--acento); margin-right: 4px; }
+.admin-acciones { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .raf-inputs { grid-template-columns: 1fr; }
+  .raf-fila { flex-wrap: wrap; }
+}
+
 /* Botón "Redactar con IA" del formulario */
 .sinopsis-ia { display: flex; gap: 10px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
 .sinopsis-ia .btn-secundario:disabled { opacity: 0.5; cursor: not-allowed; }

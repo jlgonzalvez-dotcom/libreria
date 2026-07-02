@@ -40,7 +40,10 @@ const aviso = ok ? mensajes[ok] : '';
         <h1>Tu biblioteca</h1>
         <p class="admin-sub">{total} {total === 1 ? 'libro' : 'libros'} en el catálogo.</p>
       </div>
-      <a href="/admin/nuevo" class="btn">+ Añadir libro</a>
+      <div class="admin-acciones">
+        <a href="/admin/rafaga" class="btn-secundario">⚡ Modo ráfaga</a>
+        <a href="/admin/nuevo" class="btn">+ Añadir libro</a>
+      </div>
     </div>
 
     {aviso && <p class="aviso ok">{aviso}</p>}

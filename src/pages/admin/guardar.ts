@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { crearLibro, actualizarLibro, generarSlugUnico } from '../../lib/libros';
 import { esIsbn } from '../../lib/isbn';
+import { esPortadaPropia, guardarPortadaDesdeUrl } from '../../lib/storage';
 
 // ── Helpers de parseo del formulario ─────────────────────────────────────────
 function lista(valor: FormDataEntryValue | null): string[] {
@@ -67,6 +68,13 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     estado_conservacion: texto(datos.get('estado_conservacion')),
     resena: texto(datos.get('resena')),
   };
+
+  // Portada externa (Google, Open Library, otra web) → copia al almacén
+  // propio, que no caduca. Si la copia falla, se queda la URL externa.
+  if (campos.portada && /^https?:\/\//.test(campos.portada) && !esPortadaPropia(campos.portada)) {
+    const propia = await guardarPortadaDesdeUrl(campos.portada);
+    if (propia) campos.portada = propia;
+  }
 
   if (id) {
     const slug = await generarSlugUnico(titulo, id);
