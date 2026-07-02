@@ -95,7 +95,7 @@ function estrellas(n?: number | null) {
                 <a class="hero-mini" href={`/libros/${libro.slug}/`} title={`${libro.titulo} — ${libro.autor}`}>
                   <div class="hero-mini-cover">
                     {libro.portada ? (
-                      <img src={libro.portada} alt={`Portada de ${libro.titulo}`} loading="lazy" />
+                      <img src={libro.portada} alt={`Portada de ${libro.titulo}`} fetchpriority="high" decoding="async" />
                     ) : (
                       <span>{libro.titulo.charAt(0)}</span>
                     )}
@@ -167,7 +167,7 @@ function estrellas(n?: number | null) {
               <article class="libro" data-categoria={libro.categoria} data-busqueda={busqueda}>
                 <a href={`/libros/${libro.slug}/`}>
                   <div class="portada">
-                    {libro.portada ? <img src={libro.portada} alt={`Portada de ${libro.titulo}`} /> : libro.titulo.charAt(0)}
+                    {libro.portada ? <img src={libro.portada} alt={`Portada de ${libro.titulo}`} loading="lazy" decoding="async" /> : libro.titulo.charAt(0)}
                     {libro.destacado && <span class="cinta">Destacado</span>}
                   </div>
                   <div class="cuerpo">

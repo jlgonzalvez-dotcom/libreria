@@ -4,12 +4,26 @@ import '../styles/global.css';
 interface Props {
   titulo?: string;
   descripcion?: string;
+  /** URL de la imagen para la vista previa al compartir (portada del libro). */
+  imagen?: string | null;
+  /** Tipo Open Graph: 'website' (por defecto) o 'book' en las fichas. */
+  tipo?: 'website' | 'book';
 }
 
 const {
   titulo = 'La librería de JL',
   descripcion = 'Catálogo de mi colección de libros',
+  imagen = null,
+  tipo = 'website',
 } = Astro.props;
+
+// URLs absolutas para compartir (WhatsApp, etc. exigen URL completa, no relativa).
+const canonica = new URL(Astro.url.pathname, Astro.site).href;
+// Si la página no aporta imagen (p. ej. la portada del libro), se usa el
+// cartel genérico de la web. La portada de un libro es vertical → tarjeta
+// pequeña ("summary"); el cartel es apaisado → tarjeta grande.
+const imagenOg = new URL(imagen ?? '/og-portada.png', Astro.site).href;
+const tarjetaTwitter = imagen ? 'summary' : 'summary_large_image';
 ---
 
 <!doctype html>
@@ -19,6 +33,23 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={descripcion} />
     <title>{titulo}</title>
+    <link rel="canonical" href={canonica} />
+
+    <!-- Vista previa al compartir (WhatsApp, Telegram, redes…) -->
+    <meta property="og:site_name" content="La librería de JL" />
+    <meta property="og:locale" content="es_ES" />
+    <meta property="og:type" content={tipo} />
+    <meta property="og:url" content={canonica} />
+    <meta property="og:title" content={titulo} />
+    <meta property="og:description" content={descripcion} />
+    <meta property="og:image" content={imagenOg} />
+    <meta name="twitter:card" content={tarjetaTwitter} />
+    <meta name="twitter:title" content={titulo} />
+    <meta name="twitter:description" content={descripcion} />
+    <meta name="twitter:image" content={imagenOg} />
+
+    <!-- Color de la barra del navegador (móvil); lo actualiza el modo noche. -->
+    <meta name="theme-color" content="#faf7f1" id="meta-tema" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%93%9A%3C/text%3E%3C/svg%3E" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -30,8 +61,10 @@ const {
       // Aplica el tema guardado ANTES de pintar, para que no parpadee.
       (function () {
         try {
-          if (localStorage.getItem('tema') === 'noche')
+          if (localStorage.getItem('tema') === 'noche') {
             document.documentElement.setAttribute('data-tema', 'noche');
+            document.getElementById('meta-tema')?.setAttribute('content', '#16120e');
+          }
         } catch (e) {}
       })();
     </script>
@@ -67,6 +100,7 @@ const {
         btn?.addEventListener('click', () => {
           actual = actual === 'noche' ? 'dia' : 'noche';
           document.documentElement.setAttribute('data-tema', actual);
+          document.getElementById('meta-tema')?.setAttribute('content', actual === 'noche' ? '#16120e' : '#faf7f1');
           try { localStorage.setItem('tema', actual); } catch (e) {}
           pintar();
         });

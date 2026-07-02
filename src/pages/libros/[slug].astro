@@ -1,13 +1,17 @@
 ---
 import { marked } from 'marked';
 import Layout from '../../layouts/Layout.astro';
-import { obtenerLibroPorSlug } from '../../lib/libros';
+import { listarLibros } from '../../lib/libros';
 
 const { slug } = Astro.params;
-const libro = slug ? await obtenerLibroPorSlug(slug) : null;
+
+// Una sola consulta: el libro por su slug + el resto para "relacionados".
+const todos = await listarLibros();
+const libro = todos.find((l) => l.slug === slug) ?? null;
 
 if (!libro) {
-  return new Response('Libro no encontrado', { status: 404 });
+  // Página 404 con el estilo de la casa (en vez de un texto plano).
+  return Astro.rewrite('/404');
 }
 
 function estrellas(n?: number | null) {
@@ -18,16 +22,81 @@ const autores = [libro.autor, ...libro.autores_extra].join(', ');
 
 // Las notas se escriben en Markdown desde el panel /admin (contenido propio).
 const notasHtml = libro.notas ? marked.parse(libro.notas) : '';
+
+// ── Relacionados: más del mismo autor y más de la misma categoría ────────────
+const MAX_RELACIONADOS = 6;
+const delAutor = todos
+  .filter((l) => l.id !== libro.id && (l.autor === libro.autor || l.autores_extra.includes(libro.autor)))
+  .slice(0, MAX_RELACIONADOS);
+const idsAutor = new Set(delAutor.map((l) => l.id));
+const deCategoria = todos
+  .filter((l) => l.id !== libro.id && !idsAutor.has(l.id) && l.categoria === libro.categoria)
+  .slice(0, MAX_RELACIONADOS);
+
+// ── Descripción para buscadores y para compartir ─────────────────────────────
+// La sinopsis recortada a ~160 caracteres (en un espacio, sin cortar palabras);
+// si no hay sinopsis, una frase de catálogo.
+function recortar(texto: string, max = 160): string {
+  const limpio = texto.replace(/\s+/g, ' ').trim();
+  if (limpio.length <= max) return limpio;
+  const corte = limpio.lastIndexOf(' ', max - 1);
+  return `${limpio.slice(0, corte > 60 ? corte : max - 1)}…`;
+}
+const descripcion = libro.sinopsis
+  ? recortar(libro.sinopsis)
+  : `«${libro.titulo}», de ${autores} (${libro.categoria}). En el catálogo de La librería de JL.`;
+
+// ── Datos estructurados (schema.org) para Google ─────────────────────────────
+// Autores corporativos (autor = editorial, p. ej. "New in Chess") → Organization.
+const tipoAutor = (nombre: string) =>
+  libro.editorial && nombre === libro.editorial ? 'Organization' : 'Person';
+const CONDICION: Record<string, string> = {
+  'nuevo': 'https://schema.org/NewCondition',
+  'como nuevo': 'https://schema.org/UsedCondition',
+  'bueno': 'https://schema.org/UsedCondition',
+  'aceptable': 'https://schema.org/UsedCondition',
+};
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Book',
+  name: libro.titulo,
+  author: [libro.autor, ...libro.autores_extra].map((n) => ({ '@type': tipoAutor(n), name: n })),
+  inLanguage: libro.idioma,
+  url: new URL(Astro.url.pathname, Astro.site).href,
+  ...(libro.isbn && { isbn: libro.isbn }),
+  ...(libro.paginas && { numberOfPages: libro.paginas }),
+  ...(libro.editorial && { publisher: { '@type': 'Organization', name: libro.editorial } }),
+  ...(libro.anio && { datePublished: String(libro.anio) }),
+  ...(libro.portada && { image: libro.portada }),
+  ...(libro.sinopsis && { description: libro.sinopsis }),
+  ...(libro.en_venta && libro.precio != null && {
+    offers: {
+      '@type': 'Offer',
+      price: libro.precio,
+      priceCurrency: 'EUR',
+      availability: 'https://schema.org/InStock',
+      ...(libro.estado_conservacion && CONDICION[libro.estado_conservacion] && {
+        itemCondition: CONDICION[libro.estado_conservacion],
+      }),
+    },
+  }),
+};
 ---
 
-<Layout titulo={`${libro.titulo} — La librería de JL`} descripcion={libro.sinopsis ?? libro.titulo}>
+<Layout
+  titulo={`${libro.titulo} — La librería de JL`}
+  descripcion={descripcion}
+  imagen={libro.portada}
+  tipo="book"
+>
+  <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
   <section class="detalle">
     <div class="contenedor">
       <a class="volver" href="/">← Volver al catálogo</a>
 
       <div class="grid">
         <div class="portada-grande">
-          {libro.portada ? <img src={libro.portada} alt={`Portada de ${libro.titulo}`} /> : libro.titulo.charAt(0)}
+          {libro.portada ? <img src={libro.portada} alt={`Portada de ${libro.titulo}`} fetchpriority="high" /> : libro.titulo.charAt(0)}
         </div>
 
         <div>
@@ -64,6 +133,39 @@ const notasHtml = libro.notas ? marked.parse(libro.notas) : '';
           {notasHtml && <div class="cuerpo-md" set:html={notasHtml} />}
         </div>
       </div>
+
+      {delAutor.length > 0 && (
+        <div class="relacionados">
+          <h2>Más de {libro.autor}</h2>
+          <div class="rel-rejilla">
+            {delAutor.map((l) => (
+              <a class="rel-libro" href={`/libros/${l.slug}/`} title={`${l.titulo} — ${l.autor}`}>
+                <div class="rel-cover">
+                  {l.portada ? <img src={l.portada} alt={`Portada de ${l.titulo}`} loading="lazy" decoding="async" /> : <span>{l.titulo.charAt(0)}</span>}
+                </div>
+                <strong>{l.titulo}</strong>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {deCategoria.length > 0 && (
+        <div class="relacionados">
+          <h2>Más en {libro.categoria}</h2>
+          <div class="rel-rejilla">
+            {deCategoria.map((l) => (
+              <a class="rel-libro" href={`/libros/${l.slug}/`} title={`${l.titulo} — ${l.autor}`}>
+                <div class="rel-cover">
+                  {l.portada ? <img src={l.portada} alt={`Portada de ${l.titulo}`} loading="lazy" decoding="async" /> : <span>{l.titulo.charAt(0)}</span>}
+                </div>
+                <strong>{l.titulo}</strong>
+                <em>{l.autor}</em>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   </section>
 </Layout>
