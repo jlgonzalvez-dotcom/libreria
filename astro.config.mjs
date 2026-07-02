@@ -10,7 +10,9 @@ export default defineConfig({
   // SSR: las páginas se renderizan en el servidor (leen de la base de datos
   // en cada petición). El panel /admin necesita esto para guardar libros.
   output: 'server',
-  adapter: vercel(),
+  // maxDuration: la generación de sinopsis (fuentes + IA) puede pasar de los
+  // 10 s por defecto de las funciones de Vercel; les damos hasta 60 s.
+  adapter: vercel({ maxDuration: 60 }),
 
   // Astro activa por defecto una comprobación anti-CSRF por Origin que, tras el
   // proxy de Vercel, rechaza todos los POST de formularios (403). La desactivamos:
@@ -33,6 +35,11 @@ export default defineConfig({
       // de la compartida que se agota (error 429). Si falta, funciona igual con
       // la cuota compartida. Se genera en Google Cloud (API "Books API").
       GOOGLE_BOOKS_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      // Clave de la API de Claude (Anthropic) para redactar sinopsis. OPCIONAL:
+      // sin ella todo funciona igual, solo se desactiva el botón "Redactar con
+      // IA" y la página /admin/sinopsis lo avisa. Se crea en
+      // https://console.anthropic.com (requiere cargar un pequeño saldo).
+      ANTHROPIC_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
     },
   },
 });

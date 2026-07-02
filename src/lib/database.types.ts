@@ -37,6 +37,7 @@ export type Database = {
           precio: number | null
           resena: string | null
           sinopsis: string | null
+          sinopsis_borrador: string | null
           slug: string
           subcategorias: string[]
           titulo: string
@@ -68,6 +69,7 @@ export type Database = {
           precio?: number | null
           resena?: string | null
           sinopsis?: string | null
+          sinopsis_borrador?: string | null
           slug: string
           subcategorias?: string[]
           titulo: string
@@ -99,6 +101,7 @@ export type Database = {
           precio?: number | null
           resena?: string | null
           sinopsis?: string | null
+          sinopsis_borrador?: string | null
           slug?: string
           subcategorias?: string[]
           titulo?: string

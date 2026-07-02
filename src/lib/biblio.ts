@@ -117,7 +117,11 @@ async function openLibraryIsbn(isbn: string): Promise<DatosLibro | null> {
     editorial: libro.publishers?.[0]?.name ?? null,
     paginas: libro.number_of_pages ?? null,
     portada: libro.cover?.large ?? libro.cover?.medium ?? null,
-    sinopsis: typeof libro.notes === 'string' ? libro.notes : null,
+    // OJO: el campo `notes` de Open Library son notas de catalogación
+    // ("Translation of…", "Source title: …"), NO una sinopsis — era el origen
+    // de las "sinopsis basura" que hubo que limpiar por SQL. La sinopsis de
+    // verdad vive en la ficha de la OBRA (ver sinopsisObraOpenLibrary).
+    sinopsis: null,
     isbn,
   };
 }
@@ -263,6 +267,32 @@ async function k10plusIsbn(isbn: string): Promise<DatosLibro | null> {
 }
 
 /**
+ * Descripción de la "obra" de Open Library por ISBN. La ficha de edición
+ * (openLibraryIsbn) casi nunca trae descripción, pero la de la OBRA a la que
+ * pertenece sí la tiene a menudo. Cuesta dos peticiones más, así que solo se
+ * consulta cuando ninguna otra fuente trajo sinopsis. Suele venir en inglés:
+ * sirve como material para el botón "Redactar con IA" (que la traduce y limpia).
+ */
+async function sinopsisObraOpenLibrary(isbn: string): Promise<string | null> {
+  const conTimeout = (url: string) => {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 5000);
+    return fetch(url, { signal: ac.signal }).finally(() => clearTimeout(t));
+  };
+  const ed = await conTimeout(`https://openlibrary.org/isbn/${isbn}.json`);
+  if (!ed.ok) return null;
+  const edicion: any = await ed.json();
+  const obraKey = edicion.works?.[0]?.key;
+  if (typeof obraKey !== 'string') return null;
+  const w = await conTimeout(`https://openlibrary.org${obraKey}.json`);
+  if (!w.ok) return null;
+  const obra: any = await w.json();
+  const d = obra.description;
+  const texto = typeof d === 'string' ? d : typeof d?.value === 'string' ? d.value : null;
+  return texto?.trim() || null;
+}
+
+/**
  * Portada de Open Library por ISBN. Existe para muchísimos libros aunque Open
  * Library no tenga su ficha de datos (p. ej. cuando solo los encuentra la BNE).
  * Con `default=false` devuelve 404 si no hay portada, así no servimos una en blanco.
@@ -320,6 +350,12 @@ export async function buscarDatos(consulta: string): Promise<DatosLibro> {
     if (r && !r.portada) {
       const p = await portadaOpenLibraryIsbn(isbn).catch(() => null);
       if (p) r.portada = p;
+    }
+    // Ídem con la sinopsis: si nadie la trajo, probamos la descripción de la
+    // "obra" de Open Library (a menudo existe aunque la ficha de edición no).
+    if (r && !r.sinopsis) {
+      const s = await sinopsisObraOpenLibrary(isbn).catch(() => null);
+      if (s) r.sinopsis = s;
     }
     return r ?? { encontrado: false };
   }

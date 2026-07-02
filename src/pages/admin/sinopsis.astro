@@ -1,0 +1,204 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { listarLibros, type Libro } from '../../lib/libros';
+import { hayClaveIa } from '../../lib/ia';
+
+const libros = await listarLibros();
+const hayClave = hayClaveIa();
+
+const tieneSinopsis = (l: Libro) => Boolean(l.sinopsis && l.sinopsis.trim() !== '');
+const borradores = libros.filter((l) => l.sinopsis_borrador && l.sinopsis_borrador.trim() !== '');
+const idsBorrador = new Set(borradores.map((l) => l.id));
+const pendientes = libros.filter((l) => !tieneSinopsis(l) && !idsBorrador.has(l.id));
+const conSinopsis = libros.filter(tieneSinopsis).length;
+
+// Cola de trabajo para el cliente (solo id y título, para el registro en vivo).
+const colaJson = JSON.stringify(pendientes.map((l) => ({ id: l.id, titulo: l.titulo }))).replace(/</g, '\\u003c');
+
+// Coste estimado del lote (~0,2 céntimos por sinopsis con el modelo pequeño).
+const costeEstimado = Math.max(0.01, pendientes.length * 0.002).toFixed(2).replace('.', ',');
+---
+
+<AdminLayout titulo="Sinopsis con IA · Admin">
+  <section class="contenedor admin">
+    <div class="admin-top">
+      <div>
+        <h1>Sinopsis con IA</h1>
+        <p class="admin-sub" id="sino-resumen">
+          {conSinopsis} con sinopsis · {borradores.length} {borradores.length === 1 ? 'borrador' : 'borradores'} por revisar · {pendientes.length} sin sinopsis
+        </p>
+      </div>
+      <a href="/admin" class="btn-secundario">← Volver al listado</a>
+    </div>
+
+    {!hayClave && (
+      <div class="aviso error">
+        <strong>Falta la clave de la API de Claude.</strong> Para activar la redacción con IA:
+        crea una clave en <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>
+        (Settings → API keys, requiere cargar un pequeño saldo), añádela como
+        <code>ANTHROPIC_API_KEY</code> en el archivo <code>.env</code> (en local) y en las
+        variables de entorno de Vercel (producción). Cada sinopsis cuesta ~0,2 céntimos.
+      </div>
+    )}
+
+    <div class="sino-generar">
+      <h2>1 · Generar borradores</h2>
+      <p class="sino-explica">
+        La IA redacta un <strong>borrador</strong> de sinopsis para cada libro que no la tenga:
+        usa la descripción de las fuentes bibliográficas si existe (la traduce y la limpia) y,
+        si no hay, solo redacta cuando conoce la obra con seguridad — nunca inventa. Nada se
+        publica sin tu aprobación en el paso 2.
+      </p>
+      <div class="sino-controles">
+        <button
+          type="button"
+          id="btn-generar"
+          class="btn"
+          disabled={!hayClave || pendientes.length === 0}
+        >✨ Generar borradores ({pendientes.length} libros · ~{costeEstimado} €)</button>
+        <button type="button" id="btn-detener" class="btn-secundario" hidden>Detener</button>
+      </div>
+      <div class="sino-progreso" id="sino-progreso" hidden>
+        <div class="sino-barra"><span id="sino-barra-fill"></span></div>
+        <p class="ayuda" id="sino-estado"></p>
+        <ul class="sino-log" id="sino-log"></ul>
+      </div>
+    </div>
+
+    <div class="sino-revisar">
+      <h2>2 · Revisar y aprobar <span class="badge" id="contador-borradores">{borradores.length}</span></h2>
+      {borradores.length === 0 ? (
+        <p class="vacio" id="sin-borradores">No hay borradores pendientes. Genera unos cuantos en el paso 1.</p>
+      ) : (
+        <p class="sino-explica">Corrige lo que quieras en el texto y pulsa «Aprobar» para publicarlo en la ficha, o «Descartar» para tirarlo.</p>
+      )}
+      <div class="sino-cards">
+        {borradores.map((l) => (
+          <article class="sino-card" data-id={l.id}>
+            <div class="sino-card-cover">
+              {l.portada ? <img src={l.portada} alt={`Portada de ${l.titulo}`} loading="lazy" decoding="async" /> : <span>{l.titulo.charAt(0)}</span>}
+            </div>
+            <div class="sino-card-cuerpo">
+              <strong>{l.titulo}</strong>
+              <em>{l.autor}</em>
+              <textarea rows="5">{l.sinopsis_borrador}</textarea>
+              <div class="sino-card-acciones">
+                <button type="button" class="btn btn-aprobar">Aprobar</button>
+                <button type="button" class="btn-secundario btn-descartar">Descartar</button>
+                <small class="ayuda sino-card-msg"></small>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+
+    {pendientes.length > 0 && (
+      <details class="sino-pendientes">
+        <summary>{pendientes.length} libros sin sinopsis (pendientes de generar)</summary>
+        <ul>
+          {pendientes.map((l) => <li>{l.titulo} <span class="ayuda">— {l.autor}</span></li>)}
+        </ul>
+      </details>
+    )}
+  </section>
+</AdminLayout>
+
+<script type="application/json" id="cola-libros" is:inline set:html={colaJson}></script>
+
+<script>
+  const $ = (id: string) => document.getElementById(id);
+
+  // ── Paso 1: generar borradores en lote (secuencial, con progreso) ──────────
+  const cola: { id: string; titulo: string }[] = (() => {
+    try { return JSON.parse($('cola-libros')?.textContent || '[]'); } catch { return []; }
+  })();
+
+  const btnGenerar = $('btn-generar') as HTMLButtonElement | null;
+  const btnDetener = $('btn-detener') as HTMLButtonElement | null;
+  const progreso = $('sino-progreso');
+  const barraFill = $('sino-barra-fill');
+  const estado = $('sino-estado');
+  const log = $('sino-log');
+  let detener = false;
+
+  function logLinea(simbolo: string, texto: string) {
+    if (!log) return;
+    const li = document.createElement('li');
+    li.textContent = `${simbolo} ${texto}`;
+    log.prepend(li);
+  }
+
+  btnGenerar?.addEventListener('click', async () => {
+    if (cola.length === 0) return;
+    btnGenerar.disabled = true;
+    if (btnDetener) btnDetener.hidden = false;
+    if (progreso) progreso.hidden = false;
+    detener = false;
+
+    let ok = 0, noSe = 0, errores = 0, hechos = 0;
+    for (const libro of cola) {
+      if (detener) break;
+      if (estado) estado.textContent = `Redactando ${hechos + 1} de ${cola.length}: «${libro.titulo}»…`;
+      try {
+        const res = await fetch('/admin/sinopsis-generar', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ id: libro.id }),
+        });
+        const data = await res.json();
+        if (data.resultado === 'ok') { ok++; logLinea('✓', libro.titulo); }
+        else if (data.resultado === 'desconocido') { noSe++; logLinea('¿?', `${libro.titulo} — la IA no la conoce; queda para rellenar a mano`); }
+        else if (data.resultado === 'sin-clave') { logLinea('✗', 'Falta la clave de la API — proceso detenido.'); break; }
+        else { errores++; logLinea('✗', `${libro.titulo} — ${data.detalle || 'error'}`); }
+      } catch {
+        errores++;
+        logLinea('✗', `${libro.titulo} — error de conexión`);
+      }
+      hechos++;
+      if (barraFill) barraFill.style.width = `${Math.round((hechos / cola.length) * 100)}%`;
+    }
+
+    if (estado) estado.textContent =
+      `Hecho: ${ok} borradores nuevos · ${noSe} sin datos fiables · ${errores} errores. Recargando para revisarlos…`;
+    if (btnDetener) btnDetener.hidden = true;
+    setTimeout(() => location.reload(), 2500);
+  });
+
+  btnDetener?.addEventListener('click', () => {
+    detener = true;
+    if (estado) estado.textContent = 'Deteniendo al terminar el libro en curso…';
+  });
+
+  // ── Paso 2: aprobar / descartar borradores ──────────────────────────────────
+  const contadorBorradores = $('contador-borradores');
+
+  async function revisar(card: HTMLElement, accion: 'aprobar' | 'descartar') {
+    const id = card.dataset.id;
+    const textarea = card.querySelector('textarea') as HTMLTextAreaElement | null;
+    const msg = card.querySelector('.sino-card-msg');
+    const botones = card.querySelectorAll('button');
+    botones.forEach((b) => ((b as HTMLButtonElement).disabled = true));
+    if (msg) msg.textContent = accion === 'aprobar' ? 'Publicando…' : 'Descartando…';
+    try {
+      const res = await fetch('/admin/sinopsis-aprobar', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id, accion, texto: textarea?.value ?? '' }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Error');
+      card.remove();
+      const quedan = document.querySelectorAll('.sino-card').length;
+      if (contadorBorradores) contadorBorradores.textContent = String(quedan);
+    } catch (e) {
+      if (msg) msg.textContent = 'No se pudo guardar. Vuelve a intentarlo.';
+      botones.forEach((b) => ((b as HTMLButtonElement).disabled = false));
+    }
+  }
+
+  document.querySelectorAll<HTMLElement>('.sino-card').forEach((card) => {
+    card.querySelector('.btn-aprobar')?.addEventListener('click', () => revisar(card, 'aprobar'));
+    card.querySelector('.btn-descartar')?.addEventListener('click', () => revisar(card, 'descartar'));
+  });
+</script>

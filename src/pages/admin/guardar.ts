@@ -57,6 +57,9 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     formato: String(datos.get('formato') ?? 'papel'),
     portada: texto(datos.get('portada')),
     sinopsis: texto(datos.get('sinopsis')),
+    // Si se guarda una sinopsis desde el formulario, el borrador de IA que
+    // hubiera pendiente deja de tener sentido: se limpia.
+    ...(texto(datos.get('sinopsis')) ? { sinopsis_borrador: null } : {}),
     notas: texto(datos.get('notas')),
     destacado: datos.get('destacado') === 'on',
     en_venta: datos.get('en_venta') === 'on',

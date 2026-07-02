@@ -7,6 +7,10 @@ import {
   CATEGORIAS_SUGERIDAS,
   IDIOMAS,
 } from '../lib/libros';
+import { hayClaveIa } from '../lib/ia';
+
+// ¿Está configurada la clave de la API de Claude? (Activa "Redactar con IA".)
+const hayIa = hayClaveIa();
 
 interface Props {
   libro?: Libro | null;
@@ -247,6 +251,16 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
     <div class="campo">
       <label for="sinopsis">Sinopsis</label>
       <textarea id="sinopsis" name="sinopsis" rows="3">{v.sinopsis}</textarea>
+      <div class="sinopsis-ia">
+        <button type="button" id="btn-sinopsis-ia" class="btn-secundario" disabled={!hayIa} title={hayIa ? 'Redactar (o traducir y limpiar) la sinopsis con IA' : 'Configura la clave ANTHROPIC_API_KEY para activarlo'}>
+          ✨ Redactar con IA
+        </button>
+        <small id="sinopsis-ia-msg" class="ayuda">
+          {hayIa
+            ? 'Usa lo que ya haya en el cuadro (lo traduce y limpia) o redacta de cero si conoce el libro.'
+            : 'Se activará al configurar la clave de la API — ver el aviso en ✨ Sinopsis.'}
+        </small>
+      </div>
     </div>
     <div class="campo">
       <label for="notas">Notas / reseña <small class="ayuda">(admite Markdown)</small></label>
@@ -806,6 +820,58 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
     evaluarDuplicado();
     if (dupAlto && !confirm('Parece que este libro ya está en tu colección.\n\n¿Quieres añadirlo de todas formas?')) {
       e.preventDefault();
+    }
+  });
+
+  // ── Redactar la sinopsis con IA ─────────────────────────────────────────────
+  // Manda los datos tecleados (y la sinopsis actual como material, si la hay)
+  // al servidor, que consulta a Claude y devuelve el texto. No guarda nada:
+  // el texto cae en el cuadro para que JLG lo revise y lo guarde con el libro.
+  const btnSinopsisIa = $('btn-sinopsis-ia') as HTMLButtonElement | null;
+  const sinopsisEl = $('sinopsis') as HTMLTextAreaElement | null;
+  const sinopsisMsg = $('sinopsis-ia-msg');
+
+  btnSinopsisIa?.addEventListener('click', async () => {
+    if (!sinopsisEl) return;
+    const titulo = (($('titulo') as HTMLInputElement | null)?.value || '').trim();
+    const autor = (($('autor') as HTMLInputElement | null)?.value || '').trim();
+    if (!titulo || !autor) {
+      if (sinopsisMsg) sinopsisMsg.textContent = 'Rellena antes el título y el autor.';
+      return;
+    }
+    btnSinopsisIa.disabled = true;
+    if (sinopsisMsg) sinopsisMsg.textContent = 'Redactando… (unos segundos)';
+    try {
+      const res = await fetch('/admin/sinopsis-generar', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          titulo,
+          autor,
+          autores_extra: ($('autores_extra') as HTMLInputElement | null)?.value || '',
+          editorial: ($('editorial') as HTMLInputElement | null)?.value || '',
+          anio: ($('anio') as HTMLInputElement | null)?.value || '',
+          categoria: ($('categoria') as HTMLInputElement | null)?.value || '',
+          idioma: ($('idioma') as HTMLSelectElement | null)?.value || '',
+          isbn: isbnInput?.value || '',
+          sinopsis: sinopsisEl.value || '',
+        }),
+      });
+      const data = await res.json();
+      if (data.resultado === 'ok' && data.sinopsis) {
+        sinopsisEl.value = data.sinopsis;
+        if (sinopsisMsg) sinopsisMsg.textContent = 'Borrador redactado — revísalo y ajusta lo que quieras antes de guardar.';
+      } else if (data.resultado === 'desconocido') {
+        if (sinopsisMsg) sinopsisMsg.textContent = 'La IA no conoce este libro con seguridad y prefiere no inventar. Escríbela a mano.';
+      } else if (data.resultado === 'sin-clave') {
+        if (sinopsisMsg) sinopsisMsg.textContent = 'Falta la clave de la API (ver ✨ Sinopsis).';
+      } else {
+        if (sinopsisMsg) sinopsisMsg.textContent = data.detalle || 'No se pudo redactar. Vuelve a intentarlo.';
+      }
+    } catch {
+      if (sinopsisMsg) sinopsisMsg.textContent = 'Error de conexión. Vuelve a intentarlo.';
+    } finally {
+      btnSinopsisIa.disabled = false;
     }
   });
 </script>
