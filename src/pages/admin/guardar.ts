@@ -45,6 +45,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     subcategorias: lista(datos.get('subcategorias')),
     etiquetas: lista(datos.get('etiquetas')),
     anio: numero(datos.get('anio')),
+    anio_publicacion: numero(datos.get('anio_publicacion')),
     idioma: texto(datos.get('idioma')) ?? 'Español',
     editorial: texto(datos.get('editorial')),
     edicion: numero(datos.get('edicion')),

@@ -15,6 +15,7 @@ export type Database = {
       libros: {
         Row: {
           anio: number | null
+          anio_publicacion: number | null
           autor: string
           autores_extra: string[]
           categoria: string
@@ -47,6 +48,7 @@ export type Database = {
         }
         Insert: {
           anio?: number | null
+          anio_publicacion?: number | null
           autor: string
           autores_extra?: string[]
           categoria: string
@@ -79,6 +81,7 @@ export type Database = {
         }
         Update: {
           anio?: number | null
+          anio_publicacion?: number | null
           autor?: string
           autores_extra?: string[]
           categoria?: string

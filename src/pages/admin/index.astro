@@ -2,6 +2,7 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { listarLibros } from '../../lib/libros';
 import { supabase } from '../../lib/supabase';
+import { normalizarTexto } from '../../lib/similitud';
 
 const libros = await listarLibros();
 const total = libros.length;
@@ -88,7 +89,7 @@ const aviso = ok ? mensajes[ok] : '';
           </thead>
           <tbody>
             {libros.map((libro) => (
-              <tr data-busqueda={`${libro.titulo} ${libro.autor} ${libro.categoria} ${libro.ubicacion ?? ''}`.toLowerCase()}>
+              <tr data-busqueda={normalizarTexto(`${libro.titulo} ${libro.autor} ${libro.categoria} ${libro.ubicacion ?? ''}`)}>
                 <td>
                   <a href={`/admin/${libro.id}`} class="td-titulo">{libro.titulo}</a>
                   {libro.destacado && <span class="badge dest">★ destacado</span>}
@@ -122,13 +123,14 @@ const aviso = ok ? mensajes[ok] : '';
 </AdminLayout>
 
 <script>
+  import { normalizarTexto } from '../../lib/similitud';
   const buscador = document.getElementById('admin-buscador') as HTMLInputElement | null;
   const filas = Array.from(document.querySelectorAll<HTMLElement>('tbody tr'));
   const sub = document.querySelector('.admin-sub');
   const totalLibros = filas.length;
   const plural = (n: number) => `${n} ${n === 1 ? 'libro' : 'libros'}`;
   buscador?.addEventListener('input', () => {
-    const q = buscador.value.trim().toLowerCase();
+    const q = normalizarTexto(buscador.value);
     let visibles = 0;
     for (const tr of filas) {
       const ok = q === '' || (tr.dataset.busqueda ?? '').includes(q);

@@ -66,7 +66,7 @@ const jsonLd = {
   ...(libro.isbn && { isbn: libro.isbn }),
   ...(libro.paginas && { numberOfPages: libro.paginas }),
   ...(libro.editorial && { publisher: { '@type': 'Organization', name: libro.editorial } }),
-  ...(libro.anio && { datePublished: String(libro.anio) }),
+  ...((libro.anio_publicacion || libro.anio) && { datePublished: String(libro.anio_publicacion || libro.anio) }),
   ...(libro.portada && { image: libro.portada }),
   ...(libro.sinopsis && { description: libro.sinopsis }),
   ...(libro.en_venta && libro.precio != null && {
@@ -107,6 +107,7 @@ const jsonLd = {
 
           <div class="ficha">
             <dl>
+              {libro.anio_publicacion && (<><dt>Año de publicación</dt><dd>{libro.anio_publicacion}</dd></>)}
               {libro.anio && (<><dt>Año de impresión</dt><dd>{libro.anio}</dd></>)}
               {libro.editorial && (<><dt>Editorial</dt><dd>{libro.editorial}</dd></>)}
               {libro.edicion && (<><dt>Edición</dt><dd>{libro.edicion}ª</dd></>)}

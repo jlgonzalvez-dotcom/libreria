@@ -43,6 +43,7 @@ const v = {
   subcategorias: (libro?.subcategorias ?? []).join(', '),
   etiquetas: (libro?.etiquetas ?? []).join(', '),
   anio: libro?.anio ?? '',
+  anio_publicacion: libro?.anio_publicacion ?? '',
   idioma: libro?.idioma ?? 'Español',
   editorial: libro?.editorial ?? '',
   edicion: libro?.edicion ?? '',
@@ -151,11 +152,17 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
   <fieldset>
     <legend>Datos bibliográficos</legend>
 
-    <div class="fila-3">
+    <div class="fila-2">
       <div class="campo">
-        <label for="anio">Año de impresión</label>
-        <input id="anio" name="anio" type="number" value={v.anio} min="0" max="2100" />
+        <label for="anio_publicacion" title="Año en que se publicó la obra por primera vez">Año de publicación</label>
+        <input id="anio_publicacion" name="anio_publicacion" type="number" value={v.anio_publicacion} min="0" max="2100" placeholder="1ª edición de la obra" />
       </div>
+      <div class="campo">
+        <label for="anio" title="Año en que se imprimió este ejemplar concreto">Año de impresión</label>
+        <input id="anio" name="anio" type="number" value={v.anio} min="0" max="2100" placeholder="de este ejemplar" />
+      </div>
+    </div>
+    <div class="fila-2">
       <div class="campo">
         <label for="paginas">Páginas</label>
         <input id="paginas" name="paginas" type="number" value={v.paginas} min="0" />

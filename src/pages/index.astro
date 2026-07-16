@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { listarLibros } from '../lib/libros';
+import { normalizarTexto } from '../lib/similitud';
 
 // SSR: se lee de la base de datos en cada petición.
 const libros = await listarLibros();
@@ -162,7 +163,7 @@ function estrellas(n?: number | null) {
         <div class="rejilla" id="rejilla">
           {libros.map((libro) => {
             const est = estrellas(libro.valoracion);
-            const busqueda = `${libro.titulo} ${libro.autor} ${libro.subcategorias.join(' ')} ${libro.etiquetas.join(' ')}`.toLowerCase();
+            const busqueda = normalizarTexto(`${libro.titulo} ${libro.autor} ${libro.subcategorias.join(' ')} ${libro.etiquetas.join(' ')}`);
             return (
               <article class="libro" data-categoria={libro.categoria} data-busqueda={busqueda}>
                 <a href={`/libros/${libro.slug}/`}>
@@ -239,6 +240,7 @@ function estrellas(n?: number | null) {
 </Layout>
 
 <script>
+  import { normalizarTexto } from '../lib/similitud';
   const buscador = document.getElementById('buscador') as HTMLInputElement | null;
   const chips = document.getElementById('chips');
   const contador = document.getElementById('contador');
@@ -270,7 +272,7 @@ function estrellas(n?: number | null) {
   });
 
   buscador?.addEventListener('input', () => {
-    texto = buscador.value.trim().toLowerCase();
+    texto = normalizarTexto(buscador.value);
     aplicar();
   });
 
