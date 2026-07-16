@@ -42,6 +42,7 @@ const aviso = ok ? mensajes[ok] : '';
         <p class="admin-sub">{total} {total === 1 ? 'libro' : 'libros'} en el catálogo.</p>
       </div>
       <div class="admin-acciones">
+        <a href="/admin/exportar" class="btn-secundario" title="Descargar toda la colección en un archivo (CSV) como copia de seguridad">⬇ Copia de seguridad</a>
         <a href="/admin/rafaga" class="btn-secundario">⚡ Modo ráfaga</a>
         <a href="/admin/nuevo" class="btn">+ Añadir libro</a>
       </div>
