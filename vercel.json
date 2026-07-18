@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/copia-seguridad",
+      "schedule": "0 5 * * 1"
+    }
+  ]
+}

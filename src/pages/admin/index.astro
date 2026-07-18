@@ -23,6 +23,11 @@ const hace30 = Date.now() - 30 * 86400000;
 const nuevosMes = libros.filter((l) => new Date(l.created_at).getTime() >= hace30).length;
 const borradoresPendientes = libros.filter((l) => l.sinopsis_borrador && l.sinopsis_borrador.trim() !== '').length;
 const sinUbicacion = libros.filter((l) => !l.ubicacion || l.ubicacion.trim() === '').length;
+const prestados = libros.filter((l) => l.prestado_a && l.prestado_a.trim() !== '').length;
+
+// Fecha de préstamo en formato corto español (12/07/2026).
+const fechaEs = (iso: string | null) =>
+  iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('es-ES') : '';
 
 // Posible mensaje de confirmación tras guardar/borrar (?ok=creado|editado|borrado).
 const ok = Astro.url.searchParams.get('ok');
@@ -74,8 +79,13 @@ const aviso = ok ? mensajes[ok] : '';
         <p class="vacio">Todavía no hay libros. <a href="/admin/nuevo">Añade el primero</a>.</p>
       ) : (
         <>
-        <div class="admin-buscar" style="margin: 4px 0 20px">
-          <input id="admin-buscador" class="buscador" type="search" placeholder="Buscar por título, autor, categoría o ubicación…" autocomplete="off" />
+        <div class="admin-buscar" style="margin: 4px 0 20px; display: flex; gap: 10px; align-items: center;">
+          <input id="admin-buscador" class="buscador" type="search" placeholder="Buscar por título, autor, categoría, ubicación o prestado a…" autocomplete="off" style="flex: 1" />
+          {prestados > 0 && (
+            <button type="button" id="filtro-prestados" class="btn-secundario" title="Ver solo los libros prestados">
+              📤 Prestados ({prestados})
+            </button>
+          )}
         </div>
         <table class="tabla">
           <thead>
@@ -90,11 +100,19 @@ const aviso = ok ? mensajes[ok] : '';
           </thead>
           <tbody>
             {libros.map((libro) => (
-              <tr data-busqueda={normalizarTexto(`${libro.titulo} ${libro.autor} ${libro.categoria} ${libro.ubicacion ?? ''}`)}>
+              <tr
+                data-busqueda={normalizarTexto(`${libro.titulo} ${libro.autor} ${libro.categoria} ${libro.ubicacion ?? ''} ${libro.prestado_a ?? ''}`)}
+                data-prestado={libro.prestado_a ? '1' : undefined}
+              >
                 <td>
                   <a href={`/admin/${libro.id}`} class="td-titulo">{libro.titulo}</a>
                   {libro.destacado && <span class="badge dest">★ destacado</span>}
                   {libro.ejemplares > 1 && <span class="badge">×{libro.ejemplares} ejemplares</span>}
+                  {libro.prestado_a && (
+                    <span class="badge prestado" title={`Prestado el ${fechaEs(libro.prestado_en)}`}>
+                      📤 {libro.prestado_a}{libro.prestado_en ? ` · ${fechaEs(libro.prestado_en)}` : ''}
+                    </span>
+                  )}
                 </td>
                 <td>{libro.autor}</td>
                 <td><span class="badge cat">{libro.categoria}</span></td>
@@ -126,20 +144,32 @@ const aviso = ok ? mensajes[ok] : '';
 <script>
   import { normalizarTexto } from '../../lib/similitud';
   const buscador = document.getElementById('admin-buscador') as HTMLInputElement | null;
+  const btnPrestados = document.getElementById('filtro-prestados');
   const filas = Array.from(document.querySelectorAll<HTMLElement>('tbody tr'));
   const sub = document.querySelector('.admin-sub');
   const totalLibros = filas.length;
   const plural = (n: number) => `${n} ${n === 1 ? 'libro' : 'libros'}`;
-  buscador?.addEventListener('input', () => {
-    const q = normalizarTexto(buscador.value);
+  let soloPrestados = false;
+
+  function filtrar() {
+    const q = normalizarTexto(buscador?.value ?? '');
     let visibles = 0;
     for (const tr of filas) {
-      const ok = q === '' || (tr.dataset.busqueda ?? '').includes(q);
+      const ok =
+        (q === '' || (tr.dataset.busqueda ?? '').includes(q)) &&
+        (!soloPrestados || tr.dataset.prestado === '1');
       tr.style.display = ok ? '' : 'none';
       if (ok) visibles++;
     }
-    if (sub) sub.textContent = q === ''
+    if (sub) sub.textContent = q === '' && !soloPrestados
       ? `${plural(totalLibros)} en el catálogo.`
-      : `${visibles} de ${plural(totalLibros)}.`;
+      : `${visibles} de ${plural(totalLibros)}${soloPrestados ? ' (prestados)' : ''}.`;
+  }
+
+  buscador?.addEventListener('input', filtrar);
+  btnPrestados?.addEventListener('click', () => {
+    soloPrestados = !soloPrestados;
+    btnPrestados.classList.toggle('activo', soloPrestados);
+    filtrar();
   });
 </script>

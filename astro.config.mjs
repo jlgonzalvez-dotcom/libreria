@@ -40,6 +40,10 @@ export default defineConfig({
       // IA" y la página /admin/sinopsis lo avisa. Se crea en
       // https://console.anthropic.com (requiere cargar un pequeño saldo).
       ANTHROPIC_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      // Secreto del cron de Vercel (copia de seguridad semanal). OPCIONAL: sin
+      // él, /api/copia-seguridad responde 503 y no hay copia automática. Vercel
+      // manda esta variable como cabecera Authorization en cada ejecución.
+      CRON_SECRET: envField.string({ context: 'server', access: 'secret', optional: true }),
     },
   },
 });

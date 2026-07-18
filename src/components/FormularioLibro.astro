@@ -53,6 +53,8 @@ const v = {
   estado: libro?.estado ?? 'pendiente',
   valoracion: libro?.valoracion ?? '',
   ubicacion: libro?.ubicacion ?? '',
+  prestado_a: libro?.prestado_a ?? '',
+  prestado_en: libro?.prestado_en ?? '',
   formato: libro?.formato ?? 'papel',
   portada: libro?.portada ?? '',
   sinopsis: libro?.sinopsis ?? '',
@@ -226,6 +228,22 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
       <input id="ubicacion" name="ubicacion" type="text" value={v.ubicacion} placeholder="p. ej. Salón — estantería A" />
     </div>
 
+    <div class="fila-2">
+      <div class="campo">
+        <label for="prestado_a">Prestado a <small class="ayuda">(vacío = no está prestado)</small></label>
+        <input id="prestado_a" name="prestado_a" type="text" value={v.prestado_a} placeholder="p. ej. Marisa" autocomplete="off" />
+      </div>
+      <div class="campo">
+        <label for="prestado_en">Prestado el</label>
+        <div class="prestado-fecha">
+          <input id="prestado_en" name="prestado_en" type="date" value={v.prestado_en} />
+          {(v.prestado_a || v.prestado_en) && (
+            <button type="button" id="btn-devuelto" class="btn-secundario" title="Vaciar los dos campos; recuerda guardar después">✓ Devuelto</button>
+          )}
+        </div>
+      </div>
+    </div>
+
     <label class="check">
       <input type="checkbox" name="destacado" checked={v.destacado} />
       Destacar en el catálogo
@@ -336,6 +354,13 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
       return { autores: [], editoriales: [], libros: [] };
     }
   })();
+
+  // ── Préstamo: "✓ Devuelto" vacía los dos campos (se guarda al enviar) ───────
+  $('btn-devuelto')?.addEventListener('click', () => {
+    ($('prestado_a') as HTMLInputElement).value = '';
+    ($('prestado_en') as HTMLInputElement).value = '';
+    ($('prestado_a') as HTMLInputElement).focus();
+  });
 
   // ── Portada: previsualización + subida ─────────────────────────────────────
   const portadaInput = $('portada') as HTMLInputElement | null;

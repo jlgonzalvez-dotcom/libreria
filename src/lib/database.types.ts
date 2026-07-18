@@ -36,6 +36,8 @@ export type Database = {
           paginas: number | null
           portada: string | null
           precio: number | null
+          prestado_a: string | null
+          prestado_en: string | null
           resena: string | null
           sinopsis: string | null
           sinopsis_borrador: string | null
@@ -69,6 +71,8 @@ export type Database = {
           paginas?: number | null
           portada?: string | null
           precio?: number | null
+          prestado_a?: string | null
+          prestado_en?: string | null
           resena?: string | null
           sinopsis?: string | null
           sinopsis_borrador?: string | null
@@ -102,6 +106,8 @@ export type Database = {
           paginas?: number | null
           portada?: string | null
           precio?: number | null
+          prestado_a?: string | null
+          prestado_en?: string | null
           resena?: string | null
           sinopsis?: string | null
           sinopsis_borrador?: string | null

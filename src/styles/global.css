@@ -544,6 +544,9 @@ a:hover { color: var(--acento-osc); }
 .td-ubicacion { font-size: 0.86rem; color: var(--tinta-suave); }
 .td-titulo:hover { color: var(--acento); }
 .badge.dest { background: rgba(176, 130, 63, 0.12); color: var(--oro); border-color: rgba(176, 130, 63, 0.3); margin-left: 8px; }
+/* Libro prestado (solo admin): a quién y desde cuándo. */
+.badge.prestado { background: rgba(122, 38, 57, 0.1); color: var(--acento); border-color: rgba(122, 38, 57, 0.28); margin-left: 8px; }
+.btn-secundario.activo { border-color: var(--acento); color: var(--acento); box-shadow: 0 0 0 3px rgba(122, 38, 57, 0.12); }
 .acciones { display: flex; gap: 14px; align-items: center; white-space: nowrap; }
 .form-inline { display: inline; margin: 0; }
 .link-accion { background: none; border: none; padding: 0; font-family: var(--sans); font-size: 0.88rem; font-weight: 500; color: var(--acento); cursor: pointer; text-decoration: none; }
@@ -568,6 +571,10 @@ a:hover { color: var(--acento-osc); }
 .form-libro input:focus, .form-libro select:focus, .form-libro textarea:focus { outline: none; border-color: var(--oro); box-shadow: 0 0 0 3px rgba(176, 130, 63, 0.14); }
 .fila-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .fila-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+/* Fecha de préstamo + botón "✓ Devuelto" en la misma línea. */
+.prestado-fecha { display: flex; gap: 8px; align-items: center; }
+.prestado-fecha input { flex: 1; min-width: 0; }
+.prestado-fecha .btn-secundario { white-space: nowrap; }
 .check { display: flex; align-items: center; gap: 9px; font-size: 0.92rem; color: var(--tinta); margin-bottom: 4px; }
 .check input { width: auto; accent-color: var(--acento); }
 .ayuda { color: var(--tinta-tenue); font-weight: 400; font-size: 0.82rem; }

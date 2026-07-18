@@ -56,6 +56,11 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     estado: String(datos.get('estado') ?? 'pendiente'),
     valoracion: numero(datos.get('valoracion')),
     ubicacion: texto(datos.get('ubicacion')),
+    prestado_a: texto(datos.get('prestado_a')),
+    // Si se apunta a quién sin fecha, se asume hoy; sin persona no hay préstamo.
+    prestado_en: texto(datos.get('prestado_a'))
+      ? (texto(datos.get('prestado_en')) ?? new Date().toISOString().slice(0, 10))
+      : null,
     formato: String(datos.get('formato') ?? 'papel'),
     portada: texto(datos.get('portada')),
     sinopsis: texto(datos.get('sinopsis')),
