@@ -29,6 +29,11 @@ const datosAutores = [...conteoAut.entries()]
   .slice(0, 10);
 const maxAutor = datosAutores[0]?.n ?? 1;
 
+// Todos los autores, en orden alfabético, para el desplegable de filtro.
+const autoresFiltro = [...conteoAut.entries()]
+  .map(([nombre, n]) => ({ nombre, n }))
+  .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
 // Paleta de la tarta (tonos de la web: burdeos, oro, verde, azul, terracota…).
 const PALETA_TARTA = [
   '#7c2d2d', '#b0823f', '#3f6b54', '#3a5a78', '#a8533f',
@@ -146,6 +151,10 @@ function estrellas(n?: number | null) {
         placeholder="Buscar por título, autor o etiqueta…"
         autocomplete="off"
       />
+      <select id="filtro-autor" class="filtro-autor" aria-label="Filtrar por autor">
+        <option value="*">Todos los autores</option>
+        {autoresFiltro.map((a) => <option value={a.nombre}>{a.nombre} ({a.n})</option>)}
+      </select>
       <div class="chips" id="chips">
         <button class="chip activo" data-cat="*">Todas</button>
         {categorias.map((c) => <button class="chip" data-cat={c}>{c}</button>)}
@@ -165,7 +174,7 @@ function estrellas(n?: number | null) {
             const est = estrellas(libro.valoracion);
             const busqueda = normalizarTexto(`${libro.titulo} ${libro.autor} ${libro.subcategorias.join(' ')} ${libro.etiquetas.join(' ')}`);
             return (
-              <article class="libro" data-categoria={libro.categoria} data-busqueda={busqueda}>
+              <article class="libro" data-categoria={libro.categoria} data-autor={libro.autor} data-busqueda={busqueda}>
                 <a href={`/libros/${libro.slug}/`}>
                   <div class="portada">
                     {libro.portada ? <img src={libro.portada} alt={`Portada de ${libro.titulo}`} loading="lazy" decoding="async" /> : libro.titulo.charAt(0)}
@@ -202,18 +211,19 @@ function estrellas(n?: number | null) {
 
       <div class="grafico-panel" id="panel-categorias">
         <h3 class="grafico-titulo">Reparto por categoría</h3>
+        <p class="grafico-pista">Pulsa una categoría para ver sus libros en el catálogo.</p>
         <div class="tarta-bloque">
           <svg class="tarta" viewBox="0 0 200 200" role="img" aria-label="Distribución de libros por categoría">
             {sectores.length === 1
-              ? <circle cx="100" cy="100" r="92" fill={sectores[0].color} />
-              : sectores.map((s) => <path d={s.path} fill={s.color}><title>{s.nombre}: {s.n} ({s.pct}%)</title></path>)}
+              ? <circle cx="100" cy="100" r="92" fill={sectores[0].color} class="sector" data-cat={sectores[0].nombre} />
+              : sectores.map((s) => <path d={s.path} fill={s.color} class="sector" data-cat={s.nombre}><title>{s.nombre}: {s.n} ({s.pct}%)</title></path>)}
             <circle cx="100" cy="100" r="46" class="tarta-centro" />
             <text x="100" y="96" text-anchor="middle" class="tarta-num">{total}</text>
             <text x="100" y="114" text-anchor="middle" class="tarta-lbl">LIBROS</text>
           </svg>
           <ul class="tarta-leyenda">
             {sectores.map((s) => (
-              <li>
+              <li data-cat={s.nombre} role="button" tabindex="0" title={`Ver los libros de ${s.nombre}`}>
                 <span class="punto" style={`background:${s.color}`}></span>
                 <span class="ley-nombre">{s.nombre}</span>
                 <span class="ley-num">{s.n} · {s.pct}%</span>
@@ -225,10 +235,11 @@ function estrellas(n?: number | null) {
 
       <div class="grafico-panel" id="panel-autores" hidden>
         <h3 class="grafico-titulo">Autores con más libros</h3>
+        <p class="grafico-pista">Pulsa un autor para ver sus libros en el catálogo.</p>
         <ul class="barras">
           {datosAutores.map((a) => (
-            <li class="barra-fila">
-              <span class="barra-nombre" title={a.nombre}>{a.nombre}</span>
+            <li class="barra-fila" data-autor={a.nombre} role="button" tabindex="0" title={`Ver los libros de ${a.nombre}`}>
+              <span class="barra-nombre">{a.nombre}</span>
               <span class="barra-track"><span class="barra-fill" style={`width:${Math.round((a.n / maxAutor) * 100)}%`}></span></span>
               <span class="barra-num">{a.n}</span>
             </li>
@@ -242,11 +253,13 @@ function estrellas(n?: number | null) {
 <script>
   import { normalizarTexto } from '../lib/similitud';
   const buscador = document.getElementById('buscador') as HTMLInputElement | null;
+  const filtroAutor = document.getElementById('filtro-autor') as HTMLSelectElement | null;
   const chips = document.getElementById('chips');
   const contador = document.getElementById('contador');
   const tarjetas = Array.from(document.querySelectorAll<HTMLElement>('.libro'));
 
   let categoria = '*';
+  let autor = '*';
   let texto = '';
 
   function aplicar() {
@@ -254,13 +267,19 @@ function estrellas(n?: number | null) {
     let visibles = 0;
     for (const t of tarjetas) {
       const okCat = categoria === '*' || t.dataset.categoria === categoria;
+      const okAut = autor === '*' || t.dataset.autor === autor;
       const okTxt = texto === '' || (t.dataset.busqueda ?? '').includes(texto);
-      const mostrar = okCat && okTxt;
+      const mostrar = okCat && okAut && okTxt;
       t.style.display = mostrar ? '' : 'none';
       if (mostrar) visibles++;
     }
     contador.textContent = `${visibles} ${visibles === 1 ? 'libro' : 'libros'}`;
   }
+
+  filtroAutor?.addEventListener('change', () => {
+    autor = filtroAutor.value;
+    aplicar();
+  });
 
   chips?.addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest('.chip') as HTMLElement | null;
@@ -320,4 +339,56 @@ function estrellas(n?: number | null) {
   );
   modal?.querySelectorAll('[data-cerrar]').forEach((el) => el.addEventListener('click', cerrarModal));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarModal(); });
+
+  // ── De los gráficos al catálogo: clicar una categoría o un autor filtra ────
+  function activarChip(cat: string) {
+    chips?.querySelectorAll<HTMLElement>('.chip').forEach((c) =>
+      c.classList.toggle('activo', (c.dataset.cat ?? '*') === cat),
+    );
+  }
+  function bajarAlCatalogo() {
+    cerrarModal();
+    document.querySelector('.catalogo')?.scrollIntoView({ behavior: 'smooth' });
+  }
+  function limpiarFiltros() {
+    categoria = '*';
+    autor = '*';
+    texto = '';
+    activarChip('*');
+    if (filtroAutor) filtroAutor.value = '*';
+    if (buscador) buscador.value = '';
+  }
+  function irACategoria(cat: string) {
+    limpiarFiltros();
+    categoria = cat;
+    activarChip(cat);
+    aplicar();
+    bajarAlCatalogo();
+  }
+  function irAAutor(nombre: string) {
+    limpiarFiltros();
+    autor = nombre;
+    if (filtroAutor) filtroAutor.value = nombre;
+    aplicar();
+    bajarAlCatalogo();
+  }
+  function objetivoGrafico(e: Event): { cat?: string; autor?: string } | null {
+    const el = (e.target as HTMLElement).closest('[data-cat], [data-autor]') as HTMLElement | null;
+    if (!el || !modal?.contains(el)) return null;
+    return { cat: el.dataset.cat, autor: el.dataset.autor };
+  }
+  modal?.addEventListener('click', (e) => {
+    const t = objetivoGrafico(e);
+    if (t?.cat) irACategoria(t.cat);
+    else if (t?.autor) irAAutor(t.autor);
+  });
+  // Accesible con teclado (las filas llevan role="button" + tabindex).
+  modal?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const t = objetivoGrafico(e);
+    if (!t) return;
+    e.preventDefault();
+    if (t.cat) irACategoria(t.cat);
+    else if (t.autor) irAAutor(t.autor);
+  });
 </script>
