@@ -10,12 +10,15 @@
 //  · Lo generado en lote se guarda como BORRADOR (sinopsis_borrador) y no se
 //    publica hasta que JLG lo apruebe en /admin/sinopsis.
 //
-// Modelo: Haiku 4.5, el modelo pequeño de Claude — elegido por coste en el
-// plan aprobado (~0,2 céntimos por sinopsis; toda la colección < 1 €).
+// Modelo: Sonnet 5 — subida de nivel acordada con JLG (2026-07-18) porque las
+// sinopsis de Haiku 4.5 salían planas. ~0,6 céntimos por sinopsis (toda la
+// colección ~1 €). Sonnet 5 no admite `temperature` (daría 400) y razona antes
+// de escribir (adaptive thinking, activado por defecto): ese razonamiento
+// también consume `max_tokens`, de ahí el límite holgado.
 import Anthropic from '@anthropic-ai/sdk';
 import { ANTHROPIC_API_KEY } from 'astro:env/server';
 
-const MODELO = 'claude-haiku-4-5';
+const MODELO = 'claude-sonnet-5';
 
 export interface DatosParaSinopsis {
   titulo: string;
@@ -76,8 +79,7 @@ export async function redactarSinopsis(datos: DatosParaSinopsis): Promise<Result
   try {
     const respuesta = await client.messages.create({
       model: MODELO,
-      max_tokens: 400,
-      temperature: 0.3,
+      max_tokens: 1500,
       system:
         'Eres el bibliotecario de «La librería de JL», un catálogo personal de libros. ' +
         'Redactas sinopsis breves y veraces para las fichas del catálogo. ' +
