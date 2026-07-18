@@ -172,4 +172,11 @@ const aviso = ok ? mensajes[ok] : '';
     btnPrestados.classList.toggle('activo', soloPrestados);
     filtrar();
   });
+
+  // Llegada desde "📤 Préstamos" de la cabecera: filtro activado de entrada.
+  if (new URLSearchParams(location.search).get('filtro') === 'prestados') {
+    soloPrestados = true;
+    btnPrestados?.classList.add('activo');
+    filtrar();
+  }
 </script>
