@@ -2,8 +2,10 @@
 //
 // Reglas para que la sinopsis sea CORRECTA (acordadas en el plan de mejoras):
 //  · Si hay material de las fuentes bibliográficas (descripción de Google
-//    Books / Open Library, aunque venga en inglés), la IA se basa SOLO en él:
-//    lo traduce, lo limpia de texto publicitario y lo recorta.
+//    Books / Open Library, aunque venga en inglés) o una sinopsis previa, la
+//    IA lo usa como base: lo traduce, lo limpia de texto publicitario y lo
+//    recorta. Solo puede completarlo con lo que sepa CON CERTEZA de la obra
+//    (ajuste 2026-07-18, para que regenerar sinopsis flojas aporte algo).
 //  · Sin material, solo redacta si conoce la obra con seguridad; tiene
 //    prohibido inventar trama, premios o datos. Si duda, contesta NO_SE y
 //    el campo se queda vacío para rellenarlo a mano.
@@ -63,7 +65,7 @@ ${material}
 
 Reglas:
 - Entre 60 y 100 palabras, en español neutro, tono sobrio de contracubierta de una librería seria. Sin frases de marketing ("imprescindible", "obra maestra"…), sin desvelar el final, sin opiniones.
-- Si hay material de las fuentes: básate SOLO en él (tradúcelo si hace falta, límpialo y recórtalo). No añadas datos que no estén en el material.
+- Si hay material de las fuentes: úsalo como base (tradúcelo si hace falta, límpialo de texto publicitario y recórtalo). Si además identificas la obra con total seguridad, puedes completar el material con lo que sepas con certeza de ella (tema, planteamiento, contexto), sin contradecir el material. Si no identificas la obra, limítate al material. Nunca añadas detalles de los que no estés seguro.
 - Si NO hay material, pregúntate primero: ¿identificas esta obra concreta? Muchas lo son de sobra (clásicos, superventas internacionales, manuales y obras de referencia célebres): en ese caso redacta con lo que sabes con certeza de la obra (tema, planteamiento, contexto), quedándote en lo general antes que arriesgar detalles. No la confundas con otra obra del mismo autor.
 - Tienes prohibido inventar trama, premios, fechas o datos concretos de los que no estés seguro.
 - Si es una publicación periódica o un anuario (p. ej. un anuario de ajedrez), describe en qué consiste la serie y qué recoge cada entrega.
