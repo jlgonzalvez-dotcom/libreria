@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { obtenerLibroPorId, actualizarLibro } from '../../lib/libros';
 import { buscarDatos } from '../../lib/biblio';
 import { redactarSinopsis, hayClaveIa, type DatosParaSinopsis } from '../../lib/ia';
+import { esSinopsisUtil } from '../../lib/sinopsis';
 
 // Protegido por el middleware (cuelga de /admin). Dos modos:
 //  · { id }        → redacta para un libro de la colección y lo guarda como
@@ -32,7 +33,9 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Material para la IA: la sinopsis ya guardada (p. ej. en inglés o sucia)
     // o, si no hay, lo que traigan las fuentes bibliográficas por ISBN.
-    let material = texto(libro.sinopsis);
+    // OJO: si lo guardado es un resto de catálogo ("Indice.", "Source title:…"),
+    // no sirve como base — se descarta y se busca material de verdad.
+    let material = esSinopsisUtil(libro.sinopsis) ? texto(libro.sinopsis) : null;
     if (!material && libro.isbn) {
       const datos = await buscarDatos(libro.isbn).catch(() => null);
       material = texto(datos?.sinopsis);

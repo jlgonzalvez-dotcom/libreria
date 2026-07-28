@@ -2,15 +2,24 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { listarLibros, type Libro } from '../../lib/libros';
 import { hayClaveIa } from '../../lib/ia';
+import { esSinopsisUtil, motivoSinopsisPobre } from '../../lib/sinopsis';
 
 const libros = await listarLibros();
 const hayClave = hayClaveIa();
 
-const tieneSinopsis = (l: Libro) => Boolean(l.sinopsis && l.sinopsis.trim() !== '');
+// "Tener sinopsis" no es tener algo escrito en el campo: al cargar libros se
+// cuelan restos de ficha de catálogo ("Indice.", "Source title:…") y folletos
+// en inglés. Esos libros también necesitan que la IA les redacte una.
+const tieneSinopsis = (l: Libro) => esSinopsisUtil(l.sinopsis);
 const borradores = libros.filter((l) => l.sinopsis_borrador && l.sinopsis_borrador.trim() !== '');
 const idsBorrador = new Set(borradores.map((l) => l.id));
 const pendientes = libros.filter((l) => !tieneSinopsis(l) && !idsBorrador.has(l.id));
 const conSinopsis = libros.filter(tieneSinopsis).length;
+// De los pendientes, los que ya tienen algo escrito pero no sirve: conviene
+// avisar de que al aprobar el borrador se sustituirá ese texto.
+const pobres = pendientes
+  .map((l) => ({ libro: l, motivo: motivoSinopsisPobre(l.sinopsis) }))
+  .filter((p): p is { libro: Libro; motivo: string } => p.motivo !== null);
 
 // Cola de trabajo para el cliente (solo id y título, para el registro en vivo).
 const colaJson = JSON.stringify(pendientes.map((l) => ({ id: l.id, titulo: l.titulo }))).replace(/</g, '\\u003c');
@@ -49,6 +58,19 @@ const costeEstimado = Math.max(0.01, pendientes.length * 0.006).toFixed(2).repla
         si no hay, solo redacta cuando conoce la obra con seguridad — nunca inventa. Nada se
         publica sin tu aprobación en el paso 2.
       </p>
+
+      {pobres.length > 0 && (
+        <div class="aviso">
+          <strong>{pobres.length} {pobres.length === 1 ? 'libro entra' : 'libros entran'} en la cola con una sinopsis pobre.</strong>
+          Tienen algo escrito en el campo sinopsis, pero no es una sinopsis: son restos que se
+          colaron al cargarlos de las fuentes. Al aprobar el borrador se sustituirá ese texto.
+          <ul class="sino-pobres">
+            {pobres.map((p) => (
+              <li>{p.libro.titulo} <span class="ayuda">— {p.motivo}: «{(p.libro.sinopsis ?? '').trim().slice(0, 60)}{(p.libro.sinopsis ?? '').trim().length > 60 ? '…' : ''}»</span></li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div class="sino-controles">
         <button
           type="button"
@@ -95,7 +117,7 @@ const costeEstimado = Math.max(0.01, pendientes.length * 0.006).toFixed(2).repla
 
     {pendientes.length > 0 && (
       <details class="sino-pendientes">
-        <summary>{pendientes.length} libros sin sinopsis (pendientes de generar)</summary>
+        <summary>{pendientes.length} libros sin sinopsis aprovechable (pendientes de generar)</summary>
         <ul>
           {pendientes.map((l) => <li>{l.titulo} <span class="ayuda">— {l.autor}</span></li>)}
         </ul>
