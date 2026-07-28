@@ -7,6 +7,7 @@ import Layout from '../layouts/Layout.astro';
 import { listarLibros } from '../lib/libros';
 import { normalizarTexto } from '../lib/similitud';
 import { categoriaEn, contarLibros, ruta, textos, LOCALE_ORDEN, type Idioma } from '../lib/i18n';
+import { distintivoEdicion, titulosRepetidos } from '../lib/ediciones';
 
 interface Props {
   lang: Idioma;
@@ -27,6 +28,10 @@ const categorias = [...new Set(libros.map((l) => l.categoria))]
 const total = libros.length;
 // Nº de autores distintos (dato de catálogo; no revela el estado de lectura).
 const autores = new Set(libros.map((l) => l.autor)).size;
+
+// Títulos de los que hay dos ediciones: a esos se les añade editorial y año
+// para que no parezcan la misma ficha repetida.
+const repetidos = titulosRepetidos(libros);
 
 // ── Datos para los gráficos del hero (modales) ───────────────────────────────
 const conteoCat = new Map<string, number>();
@@ -260,7 +265,12 @@ const jsonLdColeccion = {
                     {libro.destacado && <span class="cinta">{t('destacado')}</span>}
                   </div>
                   <div class="cuerpo">
-                    <div class="titulo">{libro.titulo}</div>
+                    <div class="titulo">
+                      {libro.titulo}
+                      {distintivoEdicion(libro, repetidos) && (
+                        <span class="edicion-distintivo">{distintivoEdicion(libro, repetidos)}</span>
+                      )}
+                    </div>
                     <div class="autor">{libro.autor}</div>
                     <div class="meta">
                       <span class="badge cat">{categoriaEn(libro.categoria, lang)}</span>

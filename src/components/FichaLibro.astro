@@ -4,6 +4,7 @@
 import { marked } from 'marked';
 import Layout from '../layouts/Layout.astro';
 import type { Libro } from '../lib/libros';
+import { distintivoEdicion, titulosRepetidos } from '../lib/ediciones';
 import {
   categoriaEn, codigoIdioma, conservacionEn, formatoEn, idiomaLibroEn, ordinalEdicion, ruta, textos,
   type Idioma,
@@ -24,6 +25,12 @@ function estrellas(n?: number | null) {
 }
 const autores = [libro.autor, ...libro.autores_extra].join(', ');
 const categoria = categoriaEn(libro.categoria, lang);
+
+// Si hay dos ediciones del mismo título, se añade "Editorial, año" para que las
+// dos fichas no se llamen exactamente igual (ni en el H1 ni en la pestaña).
+const repetidos = titulosRepetidos(todos);
+const edicion = distintivoEdicion(libro, repetidos);
+const tituloPagina = edicion ? `${libro.titulo} (${edicion})` : libro.titulo;
 
 // Sinopsis en el idioma de la página. Si aún no hay traducción inglesa, se
 // muestra la española con una nota, antes que dejar la ficha coja.
@@ -96,7 +103,7 @@ const jsonLd = {
 
 <Layout
   lang={lang}
-  titulo={`${libro.titulo} — La librería de JL`}
+  titulo={`${tituloPagina} — La librería de JL`}
   descripcion={descripcion}
   imagen={libro.portada}
   tipo="book"
@@ -113,7 +120,7 @@ const jsonLd = {
 
         <div>
           <span class="badge cat">{categoria}</span>
-          <h1>{libro.titulo}</h1>
+          <h1>{libro.titulo}{edicion && <span class="h1-edicion">{edicion}</span>}</h1>
           <p class="autor-grande">{autores}</p>
           {sinopsis && <p lang={sinopsisSinTraducir ? 'es' : undefined}>{sinopsis}</p>}
           {sinopsisSinTraducir && <p class="nota-idioma">{t('sinopsis_sin_traducir')}</p>}
@@ -158,6 +165,9 @@ const jsonLd = {
                   {l.portada ? <img src={l.portada} alt={t('portada_de', { titulo: l.titulo })} width="300" height="400" loading="lazy" decoding="async" /> : <span>{l.titulo.charAt(0)}</span>}
                 </div>
                 <strong>{l.titulo}</strong>
+                {distintivoEdicion(l, repetidos) && (
+                  <span class="edicion-distintivo">{distintivoEdicion(l, repetidos)}</span>
+                )}
               </a>
             ))}
           </div>
@@ -174,6 +184,9 @@ const jsonLd = {
                   {l.portada ? <img src={l.portada} alt={t('portada_de', { titulo: l.titulo })} width="300" height="400" loading="lazy" decoding="async" /> : <span>{l.titulo.charAt(0)}</span>}
                 </div>
                 <strong>{l.titulo}</strong>
+                {distintivoEdicion(l, repetidos) && (
+                  <span class="edicion-distintivo">{distintivoEdicion(l, repetidos)}</span>
+                )}
                 <em>{l.autor}</em>
               </a>
             ))}

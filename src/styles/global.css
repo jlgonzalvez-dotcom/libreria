@@ -920,6 +920,27 @@ a.vis-cifra:hover { border-color: var(--acento-claro); transform: translateY(-2p
 .idioma-op.activo { background: var(--crema); color: var(--acento); box-shadow: var(--sombra-sm); }
 a.idioma-op:hover { color: var(--acento); }
 
+/* ── Distintivo de edición (solo en los títulos que se repiten) ───────────── */
+.edicion-distintivo {
+  display: block;
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  font-weight: 500;
+  font-style: normal;
+  color: var(--tinta-tenue);
+  letter-spacing: 0.02em;
+  margin-top: 3px;
+}
+.h1-edicion {
+  display: block;
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--tinta-tenue);
+  letter-spacing: 0.01em;
+  margin-top: 8px;
+}
+
 /* Aviso discreto: sinopsis todavía en español dentro de la web inglesa. */
 .nota-idioma {
   font-size: 0.82rem; color: var(--tinta-tenue); font-style: italic;
