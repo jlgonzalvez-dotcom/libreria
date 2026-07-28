@@ -1,0 +1,416 @@
+---
+// Portada del catálogo público. Se usa desde /(español) y /en/(inglés): toda la
+// diferencia está en el idioma que le llega por prop; los datos son los mismos.
+import Layout from '../layouts/Layout.astro';
+import { listarLibros } from '../lib/libros';
+import { normalizarTexto } from '../lib/similitud';
+import { categoriaEn, contarLibros, ruta, textos, LOCALE_ORDEN, type Idioma } from '../lib/i18n';
+
+interface Props {
+  lang: Idioma;
+}
+const { lang } = Astro.props;
+const t = textos(lang);
+const orden = LOCALE_ORDEN[lang];
+
+// SSR: se lee de la base de datos en cada petición.
+const libros = await listarLibros();
+
+// Las categorías se guardan en español; en la web inglesa se muestran
+// traducidas, pero el valor que viaja en los filtros sigue siendo el original.
+const categorias = [...new Set(libros.map((l) => l.categoria))]
+  .map((nombre) => ({ valor: nombre, rotulo: categoriaEn(nombre, lang) }))
+  .sort((a, b) => a.rotulo.localeCompare(b.rotulo, orden));
+
+const total = libros.length;
+// Nº de autores distintos (dato de catálogo; no revela el estado de lectura).
+const autores = new Set(libros.map((l) => l.autor)).size;
+
+// ── Datos para los gráficos del hero (modales) ───────────────────────────────
+const conteoCat = new Map<string, number>();
+for (const l of libros) conteoCat.set(l.categoria, (conteoCat.get(l.categoria) ?? 0) + 1);
+const datosCategorias = [...conteoCat.entries()]
+  .map(([nombre, n]) => ({ nombre, rotulo: categoriaEn(nombre, lang), n }))
+  .sort((a, b) => b.n - a.n);
+
+const conteoAut = new Map<string, number>();
+for (const l of libros) conteoAut.set(l.autor, (conteoAut.get(l.autor) ?? 0) + 1);
+const datosAutores = [...conteoAut.entries()]
+  .map(([nombre, n]) => ({ nombre, n }))
+  .sort((a, b) => b.n - a.n)
+  .slice(0, 10);
+const maxAutor = datosAutores[0]?.n ?? 1;
+
+// Todos los autores, en orden alfabético, para el desplegable de filtro.
+const autoresFiltro = [...conteoAut.entries()]
+  .map(([nombre, n]) => ({ nombre, n }))
+  .sort((a, b) => a.nombre.localeCompare(b.nombre, orden));
+
+// Paleta de la tarta (tonos de la web: burdeos, oro, verde, azul, terracota…).
+const PALETA_TARTA = [
+  '#7c2d2d', '#b0823f', '#3f6b54', '#3a5a78', '#a8533f',
+  '#5f2121', '#d8b87e', '#6f8f6a', '#8a6d9a', '#c2705a',
+  '#9a8f81', '#4a6b7a',
+];
+
+// Sectores de la tarta (paths SVG) calculados en SSR a partir de las categorías.
+const totalCat = datosCategorias.reduce((s, d) => s + d.n, 0) || 1;
+const R = 92, CX = 100, CY = 100;
+let _ang = -Math.PI / 2; // arrancar arriba
+const sectores = datosCategorias.map((d, i) => {
+  const frac = d.n / totalCat;
+  const a0 = _ang;
+  const a1 = _ang + frac * 2 * Math.PI;
+  _ang = a1;
+  const x0 = CX + R * Math.cos(a0), y0 = CY + R * Math.sin(a0);
+  const x1 = CX + R * Math.cos(a1), y1 = CY + R * Math.sin(a1);
+  const grande = frac > 0.5 ? 1 : 0;
+  const path = `M ${CX} ${CY} L ${x0.toFixed(2)} ${y0.toFixed(2)} A ${R} ${R} 0 ${grande} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z`;
+  return { ...d, path, color: PALETA_TARTA[i % PALETA_TARTA.length], pct: Math.round(frac * 100) };
+});
+
+// Destacados del hero: los libros de 5 estrellas. Si hay muchos, se barajan y
+// se muestran como máximo MAX_DESTACADOS, rotando en cada carga (SSR → cada
+// visita ejecuta esto de nuevo, así que el orden cambia al recargar).
+const MAX_DESTACADOS = 4;
+const cincoEstrellas = libros.filter((l) => Number(l.valoracion) === 5);
+for (let i = cincoEstrellas.length - 1; i > 0; i--) {
+  const j = Math.floor(Math.random() * (i + 1)); // barajado Fisher–Yates
+  [cincoEstrellas[i], cincoEstrellas[j]] = [cincoEstrellas[j], cincoEstrellas[i]];
+}
+const destacados = cincoEstrellas.slice(0, MAX_DESTACADOS);
+
+// Si aún no hay ningún libro de 5★, no dejamos el hero vacío: caemos al
+// comportamiento anterior (el marcado como destacado, o el primero).
+const fallback = destacados.length === 0 ? (libros.find((l) => l.destacado) ?? libros[0] ?? null) : null;
+
+function estrellas(n?: number | null) {
+  if (n == null) return null;
+  const llenas = '★'.repeat(Math.round(n));
+  const vacias = '☆'.repeat(5 - Math.round(n));
+  return { llenas, vacias };
+}
+---
+
+<Layout lang={lang} titulo={t('titulo_inicio')} descripcion={t('descripcion_inicio')}>
+  <section class="hero">
+    <div class="contenedor hero-inner">
+      <div class="hero-texto">
+        <h1>{t('hero_h1_1')}<br />{t('hero_h1_2')}</h1>
+        <p class="hero-lead">{t('hero_lead')}</p>
+        <div class="stats">
+          <button class="stat" type="button" data-stat="catalogo" title={t('stat_libros_title')}><strong>{total}</strong><span>{t('stat_libros')}</span></button>
+          <button class="stat" type="button" data-stat="categorias" title={t('stat_categorias_title')}><strong>{categorias.length}</strong><span>{t('stat_categorias')}</span></button>
+          <button class="stat" type="button" data-stat="autores" title={t('stat_autores_title')}><strong>{autores}</strong><span>{t('stat_autores')}</span></button>
+        </div>
+      </div>
+
+      {
+        destacados.length > 0 ? (
+          <div class="hero-estrellas">
+            <div class={`hero-rejilla n-${destacados.length}`}>
+              {destacados.map((libro) => (
+                <a class="hero-mini" href={ruta(lang, `/libros/${libro.slug}/`)} title={`${libro.titulo} — ${libro.autor}`}>
+                  <div class="hero-mini-cover">
+                    {libro.portada ? (
+                      <img src={libro.portada} alt={t('portada_de', { titulo: libro.titulo })} fetchpriority="high" decoding="async" />
+                    ) : (
+                      <span>{libro.titulo.charAt(0)}</span>
+                    )}
+                  </div>
+                  <div class="hero-mini-info">
+                    <strong>{libro.titulo}</strong>
+                    <em>{libro.autor}</em>
+                  </div>
+                </a>
+              ))}
+            </div>
+            <span class="hero-estrellas-label"><span class="estrellas-oro">★★★★★</span> {t('hero_cinco_estrellas')}</span>
+          </div>
+        ) : (
+          fallback && (
+            <a class="hero-featured" href={ruta(lang, `/libros/${fallback.slug}/`)}>
+              <span class="hero-featured-label">{t('destacado')}</span>
+              <div class="hero-cover">
+                {fallback.portada ? (
+                  <img src={fallback.portada} alt={t('portada_de', { titulo: fallback.titulo })} />
+                ) : (
+                  <span>{fallback.titulo.charAt(0)}</span>
+                )}
+              </div>
+              <div class="hero-featured-info">
+                <strong>{fallback.titulo}</strong>
+                <em>{fallback.autor}</em>
+              </div>
+            </a>
+          )
+        )
+      }
+    </div>
+  </section>
+
+  <section class="contenedor catalogo">
+    <div class="seccion-cab">
+      <h2>{t('catalogo_h2')}</h2>
+      <p
+        class="contador"
+        id="contador"
+        data-uno={t('contador_uno')}
+        data-varios={t('contador_varios')}
+      >{contarLibros(lang, total)}</p>
+    </div>
+
+    <div class="controles-bar">
+      <input
+        id="buscador"
+        class="buscador"
+        type="search"
+        placeholder={t('buscador_placeholder')}
+        autocomplete="off"
+      />
+      <select id="filtro-autor" class="filtro-autor" aria-label={t('filtro_autor_aria')}>
+        <option value="*">{t('filtro_autor_todos')}</option>
+        {autoresFiltro.map((a) => <option value={a.nombre}>{a.nombre} ({a.n})</option>)}
+      </select>
+      <div class="chips" id="chips">
+        <button class="chip activo" data-cat="*">{t('chip_todas')}</button>
+        {categorias.map((c) => <button class="chip" data-cat={c.valor}>{c.rotulo}</button>)}
+      </div>
+      <div class="vista-toggle" id="vista-toggle" role="group" aria-label={t('vista_aria')}>
+        <button class="vista-btn activo" data-vista="rejilla" type="button" aria-label={t('vista_rejilla')} title={t('vista_rejilla_title')}>▦</button>
+        <button class="vista-btn" data-vista="lista" type="button" aria-label={t('vista_lista')} title={t('vista_lista_title')}>☰</button>
+      </div>
+    </div>
+
+    {
+      total === 0 ? (
+        <p class="vacio">{t('catalogo_vacio')}</p>
+      ) : (
+        <div class="rejilla" id="rejilla">
+          {libros.map((libro) => {
+            const est = estrellas(libro.valoracion);
+            const busqueda = normalizarTexto(`${libro.titulo} ${libro.autor} ${libro.subcategorias.join(' ')} ${libro.etiquetas.join(' ')}`);
+            return (
+              <article class="libro" data-categoria={libro.categoria} data-autor={libro.autor} data-busqueda={busqueda}>
+                <a href={ruta(lang, `/libros/${libro.slug}/`)}>
+                  <div class="portada">
+                    {libro.portada ? <img src={libro.portada} alt={t('portada_de', { titulo: libro.titulo })} loading="lazy" decoding="async" /> : libro.titulo.charAt(0)}
+                    {libro.destacado && <span class="cinta">{t('destacado')}</span>}
+                  </div>
+                  <div class="cuerpo">
+                    <div class="titulo">{libro.titulo}</div>
+                    <div class="autor">{libro.autor}</div>
+                    <div class="meta">
+                      <span class="badge cat">{categoriaEn(libro.categoria, lang)}</span>
+                      {est && (
+                        <span class="estrellas">
+                          {est.llenas}<span class="vacia">{est.vacias}</span>
+                        </span>
+                      )}
+                    </div>
+                    <div class="meta">
+                      {libro.anio && <span class="badge">{libro.anio}</span>}
+                    </div>
+                  </div>
+                </a>
+              </article>
+            );
+          })}
+        </div>
+      )
+    }
+  </section>
+
+  <div class="modal-grafico" id="modal-grafico" hidden>
+    <div class="modal-fondo" data-cerrar></div>
+    <div class="modal-caja" role="dialog" aria-modal="true" aria-label={t('modal_aria')}>
+      <button class="modal-cerrar" type="button" data-cerrar aria-label={t('cerrar')}>✕</button>
+
+      <div class="grafico-panel" id="panel-categorias">
+        <h3 class="grafico-titulo">{t('grafico_categorias_titulo')}</h3>
+        <p class="grafico-pista">{t('grafico_categorias_pista')}</p>
+        <div class="tarta-bloque">
+          <svg class="tarta" viewBox="0 0 200 200" role="img" aria-label={t('grafico_categorias_aria')}>
+            {sectores.length === 1
+              ? <circle cx="100" cy="100" r="92" fill={sectores[0].color} class="sector" data-cat={sectores[0].nombre} />
+              : sectores.map((s) => <path d={s.path} fill={s.color} class="sector" data-cat={s.nombre}><title>{s.rotulo}: {s.n} ({s.pct}%)</title></path>)}
+            <circle cx="100" cy="100" r="46" class="tarta-centro" />
+            <text x="100" y="96" text-anchor="middle" class="tarta-num">{total}</text>
+            <text x="100" y="114" text-anchor="middle" class="tarta-lbl">{t('tarta_libros')}</text>
+          </svg>
+          <ul class="tarta-leyenda">
+            {sectores.map((s) => (
+              <li data-cat={s.nombre} role="button" tabindex="0" title={t('ver_libros_categoria', { nombre: s.rotulo })}>
+                <span class="punto" style={`background:${s.color}`}></span>
+                <span class="ley-nombre">{s.rotulo}</span>
+                <span class="ley-num">{s.n} · {s.pct}%</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <div class="grafico-panel" id="panel-autores" hidden>
+        <h3 class="grafico-titulo">{t('grafico_autores_titulo')}</h3>
+        <p class="grafico-pista">{t('grafico_autores_pista')}</p>
+        <ul class="barras">
+          {datosAutores.map((a) => (
+            <li class="barra-fila" data-autor={a.nombre} role="button" tabindex="0" title={t('ver_libros_autor', { nombre: a.nombre })}>
+              <span class="barra-nombre">{a.nombre}</span>
+              <span class="barra-track"><span class="barra-fill" style={`width:${Math.round((a.n / maxAutor) * 100)}%`}></span></span>
+              <span class="barra-num">{a.n}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { normalizarTexto } from '../lib/similitud';
+  const buscador = document.getElementById('buscador') as HTMLInputElement | null;
+  const filtroAutor = document.getElementById('filtro-autor') as HTMLSelectElement | null;
+  const chips = document.getElementById('chips');
+  const contador = document.getElementById('contador');
+  const tarjetas = Array.from(document.querySelectorAll<HTMLElement>('.libro'));
+
+  // Plantillas del contador en el idioma de la página ("{n} libros" / "{n} books").
+  const plantillaUno = contador?.dataset.uno ?? '{n}';
+  const plantillaVarios = contador?.dataset.varios ?? '{n}';
+
+  let categoria = '*';
+  let autor = '*';
+  let texto = '';
+
+  function aplicar() {
+    if (!contador) return;
+    let visibles = 0;
+    for (const t of tarjetas) {
+      const okCat = categoria === '*' || t.dataset.categoria === categoria;
+      const okAut = autor === '*' || t.dataset.autor === autor;
+      const okTxt = texto === '' || (t.dataset.busqueda ?? '').includes(texto);
+      const mostrar = okCat && okAut && okTxt;
+      t.style.display = mostrar ? '' : 'none';
+      if (mostrar) visibles++;
+    }
+    const plantilla = visibles === 1 ? plantillaUno : plantillaVarios;
+    contador.textContent = plantilla.replace('{n}', String(visibles));
+  }
+
+  filtroAutor?.addEventListener('change', () => {
+    autor = filtroAutor.value;
+    aplicar();
+  });
+
+  chips?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('.chip') as HTMLElement | null;
+    if (!btn) return;
+    chips.querySelectorAll('.chip').forEach((c) => c.classList.remove('activo'));
+    btn.classList.add('activo');
+    categoria = btn.dataset.cat ?? '*';
+    aplicar();
+  });
+
+  buscador?.addEventListener('input', () => {
+    texto = normalizarTexto(buscador.value);
+    aplicar();
+  });
+
+  // ── Vista rejilla / lista (se recuerda en el navegador) ──────────────────
+  const vistaToggle = document.getElementById('vista-toggle');
+  const rejilla = document.getElementById('rejilla');
+  function setVista(v: string) {
+    if (!rejilla || !vistaToggle) return;
+    rejilla.classList.toggle('lista', v === 'lista');
+    vistaToggle.querySelectorAll<HTMLElement>('.vista-btn').forEach((b) =>
+      b.classList.toggle('activo', b.dataset.vista === v),
+    );
+    try { localStorage.setItem('vista', v); } catch (e) {}
+  }
+  vistaToggle?.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('.vista-btn') as HTMLElement | null;
+    if (b) setVista(b.dataset.vista ?? 'rejilla');
+  });
+  let vistaGuardada = 'rejilla';
+  try { if (localStorage.getItem('vista') === 'lista') vistaGuardada = 'lista'; } catch (e) {}
+  setVista(vistaGuardada);
+
+  // ── Modales de estadísticas (botones del hero) ───────────────────────────
+  const modal = document.getElementById('modal-grafico');
+  const panelCat = document.getElementById('panel-categorias');
+  const panelAut = document.getElementById('panel-autores');
+  function abrirModal(tipo: string) {
+    if (!modal || !panelCat || !panelAut) return;
+    panelCat.hidden = tipo !== 'categorias';
+    panelAut.hidden = tipo !== 'autores';
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+  function cerrarModal() {
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.style.overflow = '';
+  }
+  document.querySelectorAll<HTMLElement>('.stat').forEach((b) =>
+    b.addEventListener('click', () => {
+      const t = b.dataset.stat;
+      if (t === 'catalogo') document.querySelector('.catalogo')?.scrollIntoView({ behavior: 'smooth' });
+      else if (t) abrirModal(t);
+    }),
+  );
+  modal?.querySelectorAll('[data-cerrar]').forEach((el) => el.addEventListener('click', cerrarModal));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarModal(); });
+
+  // ── De los gráficos al catálogo: clicar una categoría o un autor filtra ────
+  function activarChip(cat: string) {
+    chips?.querySelectorAll<HTMLElement>('.chip').forEach((c) =>
+      c.classList.toggle('activo', (c.dataset.cat ?? '*') === cat),
+    );
+  }
+  function bajarAlCatalogo() {
+    cerrarModal();
+    document.querySelector('.catalogo')?.scrollIntoView({ behavior: 'smooth' });
+  }
+  function limpiarFiltros() {
+    categoria = '*';
+    autor = '*';
+    texto = '';
+    activarChip('*');
+    if (filtroAutor) filtroAutor.value = '*';
+    if (buscador) buscador.value = '';
+  }
+  function irACategoria(cat: string) {
+    limpiarFiltros();
+    categoria = cat;
+    activarChip(cat);
+    aplicar();
+    bajarAlCatalogo();
+  }
+  function irAAutor(nombre: string) {
+    limpiarFiltros();
+    autor = nombre;
+    if (filtroAutor) filtroAutor.value = nombre;
+    aplicar();
+    bajarAlCatalogo();
+  }
+  function objetivoGrafico(e: Event): { cat?: string; autor?: string } | null {
+    const el = (e.target as HTMLElement).closest('[data-cat], [data-autor]') as HTMLElement | null;
+    if (!el || !modal?.contains(el)) return null;
+    return { cat: el.dataset.cat, autor: el.dataset.autor };
+  }
+  modal?.addEventListener('click', (e) => {
+    const t = objetivoGrafico(e);
+    if (t?.cat) irACategoria(t.cat);
+    else if (t?.autor) irAAutor(t.autor);
+  });
+  // Accesible con teclado (las filas llevan role="button" + tabindex).
+  modal?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const t = objetivoGrafico(e);
+    if (!t) return;
+    e.preventDefault();
+    if (t.cat) irACategoria(t.cat);
+    else if (t.autor) irAAutor(t.autor);
+  });
+</script>

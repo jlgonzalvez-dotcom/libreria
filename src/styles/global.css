@@ -718,10 +718,23 @@ a:hover { color: var(--acento-osc); }
 .sino-pendientes summary { cursor: pointer; font-weight: 500; }
 .sino-pendientes ul { margin: 10px 0 0; padding-left: 22px; font-size: 0.9rem; columns: 2; }
 .sino-pendientes li { margin-bottom: 4px; break-inside: avoid; }
+
+/* ── Admin: sinopsis traducidas al inglés (español / inglés en paralelo) ──── */
+.trad-lista { margin-top: 14px; display: grid; gap: 14px; }
+.trad-item {
+  background: var(--crema); border: 1px solid var(--linea); border-radius: var(--radio);
+  padding: 14px 18px; box-shadow: var(--sombra-sm);
+}
+.trad-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 8px; }
+.trad-columnas p { margin: 0; font-size: 0.88rem; line-height: 1.55; color: var(--tinta-suave); }
+.trad-columnas p[lang='en'] { padding-left: 18px; border-left: 1px solid var(--linea); }
+
 @media (max-width: 640px) {
   .sino-card { flex-direction: column; }
   .sino-card-cover { flex-basis: auto; width: 72px; }
   .sino-pendientes ul { columns: 1; }
+  .trad-columnas { grid-template-columns: 1fr; gap: 10px; }
+  .trad-columnas p[lang='en'] { padding-left: 0; border-left: none; padding-top: 10px; border-top: 1px solid var(--linea); }
 }
 
 /* ── Admin: panel de visitas ──────────────────────────────────────────────── */
@@ -855,6 +868,26 @@ a.vis-cifra:hover { border-color: var(--acento-claro); transform: translateY(-2p
   transition: border-color 0.2s, color 0.2s, transform 0.25s;
 }
 .tema-btn:hover { border-color: var(--acento); color: var(--acento); transform: rotate(-15deg); }
+
+/* ── Selector de idioma ES / EN de la cabecera ──────────────────────────── */
+.idioma-sel {
+  display: inline-flex; gap: 2px; margin-left: 22px;
+  background: var(--papel-2); border: 1px solid var(--linea); border-radius: 999px; padding: 3px;
+}
+.idioma-op {
+  margin-left: 0; padding: 3px 9px; border-radius: 999px;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; line-height: 1.6;
+  color: var(--tinta-tenue); text-decoration: none; transition: background 0.2s, color 0.2s;
+}
+.nav a.idioma-op { margin-left: 0; }
+.idioma-op.activo { background: var(--crema); color: var(--acento); box-shadow: var(--sombra-sm); }
+a.idioma-op:hover { color: var(--acento); }
+
+/* Aviso discreto: sinopsis todavía en español dentro de la web inglesa. */
+.nota-idioma {
+  font-size: 0.82rem; color: var(--tinta-tenue); font-style: italic;
+  margin-top: -6px;
+}
 
 /* ── Selector de vista del catálogo (rejilla / lista) ───────────────────── */
 .vista-toggle {

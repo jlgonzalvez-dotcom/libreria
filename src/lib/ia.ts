@@ -73,6 +73,75 @@ Reglas:
 - Responde SOLO con la sinopsis (o NO_SE), sin comillas, sin título y sin preámbulos.`;
 }
 
+// ─── Traducción de sinopsis al inglés (web bilingüe /en) ────────────────────
+// Tarea mecánica comparada con redactar: va con `effort: 'low'` para gastar
+// menos (y responder antes). Coste ~0,3 céntimos por sinopsis.
+
+export interface DatosParaTraducir {
+  titulo: string;
+  autor: string;
+  /** La sinopsis en español, ya aprobada. */
+  sinopsis: string;
+}
+
+export type ResultadoTraduccion =
+  | { ok: true; texto: string }
+  | { ok: false; motivo: 'sin-clave' | 'error'; detalle?: string };
+
+/** Traduce al inglés una sinopsis española. Nunca lanza: devuelve el motivo. */
+export async function traducirSinopsis(d: DatosParaTraducir): Promise<ResultadoTraduccion> {
+  if (!ANTHROPIC_API_KEY) return { ok: false, motivo: 'sin-clave' };
+
+  const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+  try {
+    const respuesta = await client.messages.create({
+      model: MODELO,
+      max_tokens: 1500,
+      output_config: { effort: 'low' },
+      system:
+        'You translate book synopses from Spanish into English for a personal library catalogue. ' +
+        'You are faithful to the original: you never add, remove or embellish information.',
+      messages: [{
+        role: 'user',
+        content: `Translate this book synopsis into natural English.
+
+Book: «${d.titulo}» by ${d.autor}
+
+Synopsis (Spanish):
+"""
+${d.sinopsis.trim()}
+"""
+
+Rules:
+- Natural, idiomatic English — not a word-for-word rendering. Keep the sober tone of a serious bookshop's back cover.
+- Same information, same length. Do not add facts, opinions or marketing language, and do not leave anything out.
+- Keep the book title in Spanish if you mention it; do not invent an English title. Proper names stay as they are.
+- Reply with the translation only: no quotes, no title, no preamble, no notes.`,
+      }],
+    });
+
+    const texto = respuesta.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('')
+      .trim();
+
+    if (!texto) return { ok: false, motivo: 'error', detalle: 'La IA devolvió una respuesta vacía.' };
+    return { ok: true, texto };
+  } catch (e) {
+    if (e instanceof Anthropic.AuthenticationError) {
+      return { ok: false, motivo: 'error', detalle: 'La clave ANTHROPIC_API_KEY no es válida.' };
+    }
+    if (e instanceof Anthropic.RateLimitError) {
+      return { ok: false, motivo: 'error', detalle: 'Demasiadas peticiones seguidas; espera un momento.' };
+    }
+    if (e instanceof Anthropic.APIError) {
+      return { ok: false, motivo: 'error', detalle: `Error de la API (${e.status}).` };
+    }
+    return { ok: false, motivo: 'error', detalle: 'No se pudo conectar con la API.' };
+  }
+}
+
 /** Redacta (o limpia/traduce) la sinopsis de un libro. Nunca lanza: devuelve el motivo. */
 export async function redactarSinopsis(datos: DatosParaSinopsis): Promise<ResultadoSinopsis> {
   if (!ANTHROPIC_API_KEY) return { ok: false, motivo: 'sin-clave' };

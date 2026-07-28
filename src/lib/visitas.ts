@@ -12,9 +12,11 @@ import { supabase } from './supabase';
 // Robots y rastreadores más comunes (incl. las vistas previas de WhatsApp etc.).
 const RE_BOT = /bot|crawl|spider|slurp|preview|scan|probe|facebookexternalhit|whatsapp|telegram|skype|curl|wget|python|node-fetch|axios|monitor|pingdom|lighthouse|headless|vercel-screenshot/i;
 
-/** Rutas públicas que cuentan como visita (portada y fichas de libro). */
+/** Rutas públicas que cuentan como visita (portada y fichas de libro), en
+ *  cualquiera de los dos idiomas: la ruta guardada distingue /en/… del español. */
 export function esVisitaPublica(pathname: string): boolean {
-  return pathname === '/' || pathname.startsWith('/libros/');
+  const sinIdioma = pathname === '/en' ? '/' : pathname.replace(/^\/en\//, '/');
+  return sinIdioma === '/' || sinIdioma.startsWith('/libros/');
 }
 
 async function hashVisitante(ip: string, ua: string, dia: string): Promise<string> {

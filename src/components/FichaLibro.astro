@@ -1,0 +1,184 @@
+---
+// Ficha de un libro. Se usa desde /libros/[slug]/ (español) y /en/libros/[slug]/
+// (inglés). La página es quien busca el libro y decide el 404; aquí solo se pinta.
+import { marked } from 'marked';
+import Layout from '../layouts/Layout.astro';
+import type { Libro } from '../lib/libros';
+import {
+  categoriaEn, conservacionEn, formatoEn, idiomaLibroEn, ordinalEdicion, ruta, textos,
+  type Idioma,
+} from '../lib/i18n';
+
+interface Props {
+  lang: Idioma;
+  libro: Libro;
+  /** Toda la colección, ya cargada por la página (para los relacionados). */
+  todos: Libro[];
+}
+const { lang, libro, todos } = Astro.props;
+const t = textos(lang);
+
+function estrellas(n?: number | null) {
+  if (n == null) return null;
+  return '★'.repeat(Math.round(n)) + '☆'.repeat(5 - Math.round(n));
+}
+const autores = [libro.autor, ...libro.autores_extra].join(', ');
+const categoria = categoriaEn(libro.categoria, lang);
+
+// Sinopsis en el idioma de la página. Si aún no hay traducción inglesa, se
+// muestra la española con una nota, antes que dejar la ficha coja.
+const sinopsis = lang === 'en' ? (libro.sinopsis_en || libro.sinopsis) : libro.sinopsis;
+const sinopsisSinTraducir = lang === 'en' && !libro.sinopsis_en && Boolean(libro.sinopsis);
+
+// Las notas se escriben en Markdown desde el panel /admin (contenido propio).
+const notasHtml = libro.notas ? marked.parse(libro.notas) : '';
+
+// ── Relacionados: más del mismo autor y más de la misma categoría ────────────
+const MAX_RELACIONADOS = 6;
+const delAutor = todos
+  .filter((l) => l.id !== libro.id && (l.autor === libro.autor || l.autores_extra.includes(libro.autor)))
+  .slice(0, MAX_RELACIONADOS);
+const idsAutor = new Set(delAutor.map((l) => l.id));
+const deCategoria = todos
+  .filter((l) => l.id !== libro.id && !idsAutor.has(l.id) && l.categoria === libro.categoria)
+  .slice(0, MAX_RELACIONADOS);
+
+// ── Descripción para buscadores y para compartir ─────────────────────────────
+// La sinopsis recortada a ~160 caracteres (en un espacio, sin cortar palabras);
+// si no hay sinopsis, una frase de catálogo.
+function recortar(texto: string, max = 160): string {
+  const limpio = texto.replace(/\s+/g, ' ').trim();
+  if (limpio.length <= max) return limpio;
+  const corte = limpio.lastIndexOf(' ', max - 1);
+  return `${limpio.slice(0, corte > 60 ? corte : max - 1)}…`;
+}
+const descripcion = sinopsis
+  ? recortar(sinopsis)
+  : t('ficha_descripcion', { titulo: libro.titulo, autores, categoria });
+
+// ── Datos estructurados (schema.org) para Google ─────────────────────────────
+// Autores corporativos (autor = editorial, p. ej. "New in Chess") → Organization.
+const tipoAutor = (nombre: string) =>
+  libro.editorial && nombre === libro.editorial ? 'Organization' : 'Person';
+const CONDICION: Record<string, string> = {
+  'nuevo': 'https://schema.org/NewCondition',
+  'como nuevo': 'https://schema.org/UsedCondition',
+  'bueno': 'https://schema.org/UsedCondition',
+  'aceptable': 'https://schema.org/UsedCondition',
+};
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Book',
+  name: libro.titulo,
+  author: [libro.autor, ...libro.autores_extra].map((n) => ({ '@type': tipoAutor(n), name: n })),
+  inLanguage: libro.idioma,
+  url: new URL(Astro.url.pathname, Astro.site).href,
+  ...(libro.isbn && { isbn: libro.isbn }),
+  ...(libro.paginas && { numberOfPages: libro.paginas }),
+  ...(libro.editorial && { publisher: { '@type': 'Organization', name: libro.editorial } }),
+  ...((libro.anio_publicacion || libro.anio) && { datePublished: String(libro.anio_publicacion || libro.anio) }),
+  ...(libro.portada && { image: libro.portada }),
+  ...(sinopsis && { description: sinopsis }),
+  ...(libro.en_venta && libro.precio != null && {
+    offers: {
+      '@type': 'Offer',
+      price: libro.precio,
+      priceCurrency: 'EUR',
+      availability: 'https://schema.org/InStock',
+      ...(libro.estado_conservacion && CONDICION[libro.estado_conservacion] && {
+        itemCondition: CONDICION[libro.estado_conservacion],
+      }),
+    },
+  }),
+};
+---
+
+<Layout
+  lang={lang}
+  titulo={`${libro.titulo} — La librería de JL`}
+  descripcion={descripcion}
+  imagen={libro.portada}
+  tipo="book"
+>
+  <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
+  <section class="detalle">
+    <div class="contenedor">
+      <a class="volver" href={ruta(lang, '/')}>{t('volver')}</a>
+
+      <div class="grid">
+        <div class="portada-grande">
+          {libro.portada ? <img src={libro.portada} alt={t('portada_de', { titulo: libro.titulo })} fetchpriority="high" /> : libro.titulo.charAt(0)}
+        </div>
+
+        <div>
+          <span class="badge cat">{categoria}</span>
+          <h1>{libro.titulo}</h1>
+          <p class="autor-grande">{autores}</p>
+          {sinopsis && <p lang={sinopsisSinTraducir ? 'es' : undefined}>{sinopsis}</p>}
+          {sinopsisSinTraducir && <p class="nota-idioma">{t('sinopsis_sin_traducir')}</p>}
+
+          <div class="ficha">
+            <dl>
+              {libro.anio_publicacion && (<><dt>{t('ficha_anio_publicacion')}</dt><dd>{libro.anio_publicacion}</dd></>)}
+              {libro.anio && (<><dt>{t('ficha_anio')}</dt><dd>{libro.anio}</dd></>)}
+              {libro.editorial && (<><dt>{t('ficha_editorial')}</dt><dd>{libro.editorial}</dd></>)}
+              {libro.edicion && (<><dt>{t('ficha_edicion')}</dt><dd>{ordinalEdicion(libro.edicion, lang)}</dd></>)}
+              {libro.paginas && (<><dt>{t('ficha_paginas')}</dt><dd>{libro.paginas}</dd></>)}
+              <dt>{t('ficha_idioma')}</dt><dd>{idiomaLibroEn(libro.idioma, lang)}</dd>
+              <dt>{t('ficha_formato')}</dt><dd>{formatoEn(libro.formato, lang)}</dd>
+              {libro.valoracion != null && (<><dt>{t('ficha_valoracion')}</dt><dd><span class="estrellas">{estrellas(libro.valoracion)}</span></dd></>)}
+              {libro.isbn && (<><dt>{t('ficha_isbn')}</dt><dd>{libro.isbn}</dd></>)}
+              {/* La ubicación física es dato interno de inventario: solo en /admin. */}
+              {libro.subcategorias.length > 0 && (
+                <><dt>{t('ficha_generos')}</dt><dd>{libro.subcategorias.join(', ')}</dd></>
+              )}
+              {libro.etiquetas.length > 0 && (
+                <><dt>{t('ficha_etiquetas')}</dt>
+                <dd><div class="tags">{libro.etiquetas.map((tag) => <span class="badge">{tag}</span>)}</div></dd></>
+              )}
+              {libro.en_venta && (
+                <><dt>{t('ficha_en_venta')}</dt>
+                <dd>{libro.precio != null ? `${libro.precio} €` : t('si')}{libro.estado_conservacion ? ` · ${conservacionEn(libro.estado_conservacion, lang)}` : ''}</dd></>
+              )}
+            </dl>
+          </div>
+
+          {notasHtml && <div class="cuerpo-md" set:html={notasHtml} />}
+        </div>
+      </div>
+
+      {delAutor.length > 0 && (
+        <div class="relacionados">
+          <h2>{t('relacionados_autor', { autor: libro.autor })}</h2>
+          <div class="rel-rejilla">
+            {delAutor.map((l) => (
+              <a class="rel-libro" href={ruta(lang, `/libros/${l.slug}/`)} title={`${l.titulo} — ${l.autor}`}>
+                <div class="rel-cover">
+                  {l.portada ? <img src={l.portada} alt={t('portada_de', { titulo: l.titulo })} loading="lazy" decoding="async" /> : <span>{l.titulo.charAt(0)}</span>}
+                </div>
+                <strong>{l.titulo}</strong>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {deCategoria.length > 0 && (
+        <div class="relacionados">
+          <h2>{t('relacionados_categoria', { categoria })}</h2>
+          <div class="rel-rejilla">
+            {deCategoria.map((l) => (
+              <a class="rel-libro" href={ruta(lang, `/libros/${l.slug}/`)} title={`${l.titulo} — ${l.autor}`}>
+                <div class="rel-cover">
+                  {l.portada ? <img src={l.portada} alt={t('portada_de', { titulo: l.titulo })} loading="lazy" decoding="async" /> : <span>{l.titulo.charAt(0)}</span>}
+                </div>
+                <strong>{l.titulo}</strong>
+                <em>{l.autor}</em>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </section>
+</Layout>

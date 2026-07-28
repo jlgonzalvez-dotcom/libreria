@@ -1,0 +1,178 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { listarLibros, type Libro } from '../../lib/libros';
+import { hayClaveIa } from '../../lib/ia';
+
+const libros = await listarLibros();
+const hayClave = hayClaveIa();
+
+const texto = (v?: string | null) => (v ?? '').trim();
+
+// Un libro está al día en inglés si tiene traducción Y esa traducción salió
+// exactamente del texto español que hay ahora. Si la sinopsis española cambió
+// después (al aprobar un borrador o al editarla), vuelve a la cola.
+const conSinopsis = libros.filter((l) => texto(l.sinopsis) !== '');
+const alDia = conSinopsis.filter(
+  (l) => texto(l.sinopsis_en) !== '' && texto(l.sinopsis_en_de) === texto(l.sinopsis),
+);
+const pendientes = conSinopsis.filter(
+  (l) => texto(l.sinopsis_en) === '' || texto(l.sinopsis_en_de) !== texto(l.sinopsis),
+);
+const desfasadas = pendientes.filter((l) => texto(l.sinopsis_en) !== '').length;
+const sinSinopsis = libros.length - conSinopsis.length;
+
+// Cola de trabajo para el navegador (solo id y título, para el registro en vivo).
+const colaJson = JSON.stringify(pendientes.map((l) => ({ id: l.id, titulo: l.titulo })))
+  .replace(/</g, '\\u003c');
+
+// Coste estimado (~0,3 céntimos por traducción con Sonnet 5 en modo económico).
+const costeEstimado = Math.max(0.01, pendientes.length * 0.003).toFixed(2).replace('.', ',');
+---
+
+<AdminLayout titulo="Sinopsis en inglés · Admin">
+  <section class="contenedor admin">
+    <div class="admin-top">
+      <div>
+        <h1>Sinopsis en inglés</h1>
+        <p class="admin-sub">
+          {alDia.length} al día · {pendientes.length} por traducir{desfasadas > 0 ? ` (${desfasadas} cambiadas)` : ''}
+          {sinSinopsis > 0 && ` · ${sinSinopsis} aún sin sinopsis en español`}
+        </p>
+      </div>
+      <a href="/admin" class="btn-secundario">← Volver al listado</a>
+    </div>
+
+    {!hayClave && (
+      <div class="aviso error">
+        <strong>Falta la clave de la API de Claude.</strong> Sin ella no se pueden traducir las
+        sinopsis. Es la misma clave <code>ANTHROPIC_API_KEY</code> que usa la página de sinopsis.
+      </div>
+    )}
+
+    <div class="sino-generar">
+      <h2>Traducir las que faltan</h2>
+      <p class="sino-explica">
+        La versión inglesa de la web (<a href="/en/" target="_blank">lalibreriadejl.vercel.app/en/</a>)
+        muestra estas traducciones en la ficha de cada libro. Se traduce solo la sinopsis: el título,
+        el autor y la editorial se quedan como están, porque son los del ejemplar real.
+        <strong>Mientras un libro no esté traducido, su ficha inglesa enseña la sinopsis en español</strong>
+        con un aviso, así que la web nunca se queda coja.
+      </p>
+      <p class="sino-explica">
+        Cuando apruebes una sinopsis nueva en español (o corrijas una), ese libro vuelve a aparecer
+        aquí para que su inglés no se quede antiguo. No hay nada que revisar: pulsa el botón cuando
+        te acuerdes y listo.
+      </p>
+      <div class="sino-controles">
+        <button
+          type="button"
+          id="btn-traducir"
+          class="btn"
+          disabled={!hayClave || pendientes.length === 0}
+        >🌐 Traducir al inglés ({pendientes.length} {pendientes.length === 1 ? 'libro' : 'libros'} · ~{costeEstimado} €)</button>
+        <button type="button" id="btn-detener" class="btn-secundario" hidden>Detener</button>
+      </div>
+      <div class="sino-progreso" id="sino-progreso" hidden>
+        <div class="sino-barra"><span id="sino-barra-fill"></span></div>
+        <p class="ayuda" id="sino-estado"></p>
+        <ul class="sino-log" id="sino-log"></ul>
+      </div>
+    </div>
+
+    {pendientes.length > 0 && (
+      <details class="sino-pendientes">
+        <summary>{pendientes.length} {pendientes.length === 1 ? 'libro' : 'libros'} por traducir</summary>
+        <ul>
+          {pendientes.map((l) => (
+            <li>
+              {l.titulo} <span class="ayuda">— {l.autor}</span>
+              {texto(l.sinopsis_en) !== '' && <span class="ayuda"> · la española cambió</span>}
+            </li>
+          ))}
+        </ul>
+      </details>
+    )}
+
+    {alDia.length > 0 && (
+      <details class="sino-pendientes">
+        <summary>{alDia.length} ya traducidas (ver el resultado)</summary>
+        <div class="trad-lista">
+          {alDia.map((l: Libro) => (
+            <article class="trad-item">
+              <strong>{l.titulo}</strong> <span class="ayuda">— {l.autor}</span>
+              <div class="trad-columnas">
+                <p lang="es">{l.sinopsis}</p>
+                <p lang="en">{l.sinopsis_en}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </details>
+    )}
+  </section>
+</AdminLayout>
+
+<script type="application/json" id="cola-libros" is:inline set:html={colaJson}></script>
+
+<script>
+  const $ = (id: string) => document.getElementById(id);
+
+  const cola: { id: string; titulo: string }[] = (() => {
+    try { return JSON.parse($('cola-libros')?.textContent || '[]'); } catch { return []; }
+  })();
+
+  const btnTraducir = $('btn-traducir') as HTMLButtonElement | null;
+  const btnDetener = $('btn-detener') as HTMLButtonElement | null;
+  const progreso = $('sino-progreso');
+  const barraFill = $('sino-barra-fill');
+  const estado = $('sino-estado');
+  const log = $('sino-log');
+  let detener = false;
+
+  function logLinea(simbolo: string, texto: string) {
+    if (!log) return;
+    const li = document.createElement('li');
+    li.textContent = `${simbolo} ${texto}`;
+    log.prepend(li);
+  }
+
+  btnTraducir?.addEventListener('click', async () => {
+    if (cola.length === 0) return;
+    btnTraducir.disabled = true;
+    if (btnDetener) btnDetener.hidden = false;
+    if (progreso) progreso.hidden = false;
+    detener = false;
+
+    let ok = 0, errores = 0, hechos = 0;
+    for (const libro of cola) {
+      if (detener) break;
+      if (estado) estado.textContent = `Traduciendo ${hechos + 1} de ${cola.length}: «${libro.titulo}»…`;
+      try {
+        const res = await fetch('/admin/traducir', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ id: libro.id }),
+        });
+        const data = await res.json();
+        if (data.resultado === 'ok') { ok++; logLinea('✓', libro.titulo); }
+        else if (data.resultado === 'sin-clave') { logLinea('✗', 'Falta la clave de la API — proceso detenido.'); break; }
+        else { errores++; logLinea('✗', `${libro.titulo} — ${data.detalle || 'error'}`); }
+      } catch {
+        errores++;
+        logLinea('✗', `${libro.titulo} — error de conexión`);
+      }
+      hechos++;
+      if (barraFill) barraFill.style.width = `${Math.round((hechos / cola.length) * 100)}%`;
+    }
+
+    if (estado) estado.textContent =
+      `Hecho: ${ok} traducidas · ${errores} errores. Recargando…`;
+    if (btnDetener) btnDetener.hidden = true;
+    setTimeout(() => location.reload(), 2500);
+  });
+
+  btnDetener?.addEventListener('click', () => {
+    detener = true;
+    if (estado) estado.textContent = 'Deteniendo al terminar el libro en curso…';
+  });
+</script>

@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import { idiomaDe, rutaEnIdioma, ruta, textos, LOCALE, type Idioma } from '../lib/i18n';
 
 interface Props {
   titulo?: string;
@@ -8,17 +9,36 @@ interface Props {
   imagen?: string | null;
   /** Tipo Open Graph: 'website' (por defecto) o 'book' en las fichas. */
   tipo?: 'website' | 'book';
+  /** Idioma de la página. Por defecto, el que indica la URL (/en/… → inglés). */
+  lang?: Idioma;
 }
 
 const {
-  titulo = 'La librería de JL',
-  descripcion = 'Catálogo de mi colección de libros',
   imagen = null,
   tipo = 'website',
+  lang = idiomaDe(Astro.url),
 } = Astro.props;
+
+const t = textos(lang);
+const titulo = Astro.props.titulo ?? t('titulo_inicio');
+const descripcion = Astro.props.descripcion ?? t('descripcion_inicio');
 
 // URLs absolutas para compartir (WhatsApp, etc. exigen URL completa, no relativa).
 const canonica = new URL(Astro.url.pathname, Astro.site).href;
+// La misma página en cada idioma, para las etiquetas hreflang: así Google sabe
+// que son dos versiones de lo mismo y ofrece la inglesa a quien busca en inglés.
+const urlEs = new URL(rutaEnIdioma(Astro.url, 'es'), Astro.site).href;
+const urlEn = new URL(rutaEnIdioma(Astro.url, 'en'), Astro.site).href;
+const otroIdioma: Idioma = lang === 'es' ? 'en' : 'es';
+// Selector ES/EN: siempre en el mismo orden, con el idioma actual resaltado y
+// el otro como enlace a la misma página traducida.
+const opcionesIdioma = (['es', 'en'] as const).map((codigo) => ({
+  codigo,
+  rotulo: codigo.toUpperCase(),
+  actual: codigo === lang,
+  href: rutaEnIdioma(Astro.url, codigo),
+}));
+
 // Si la página no aporta imagen (p. ej. la portada del libro), se usa el
 // cartel genérico de la web. La portada de un libro es vertical → tarjeta
 // pequeña ("summary"); el cartel es apaisado → tarjeta grande.
@@ -27,7 +47,7 @@ const tarjetaTwitter = imagen ? 'summary' : 'summary_large_image';
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang={lang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -35,9 +55,15 @@ const tarjetaTwitter = imagen ? 'summary' : 'summary_large_image';
     <title>{titulo}</title>
     <link rel="canonical" href={canonica} />
 
+    <!-- Las dos versiones de idioma (la española es la de referencia). -->
+    <link rel="alternate" hreflang="es" href={urlEs} />
+    <link rel="alternate" hreflang="en" href={urlEn} />
+    <link rel="alternate" hreflang="x-default" href={urlEs} />
+
     <!-- Vista previa al compartir (WhatsApp, Telegram, redes…) -->
     <meta property="og:site_name" content="La librería de JL" />
-    <meta property="og:locale" content="es_ES" />
+    <meta property="og:locale" content={LOCALE[lang]} />
+    <meta property="og:locale:alternate" content={LOCALE[otroIdioma]} />
     <meta property="og:type" content={tipo} />
     <meta property="og:url" content={canonica} />
     <meta property="og:title" content={titulo} />
@@ -72,10 +98,17 @@ const tarjetaTwitter = imagen ? 'summary' : 'summary_large_image';
   <body>
     <header class="site-header">
       <div class="contenedor">
-        <a href="/" class="logo">La librería de <span>JL</span></a>
+        <a href={ruta(lang, '/')} class="logo">La librería de <span>JL</span></a>
         <nav class="nav">
-          <a href="/">Catálogo</a>
-          <button id="tema-toggle" class="tema-btn" type="button" aria-label="Cambiar entre modo día y noche" title="Modo día / noche">🌙</button>
+          <a href={ruta(lang, '/')}>{t('nav_catalogo')}</a>
+          <div class="idioma-sel" role="group" aria-label={t('nav_idioma_aria')}>
+            {opcionesIdioma.map((op) => op.actual ? (
+              <span class="idioma-op activo" aria-current="true">{op.rotulo}</span>
+            ) : (
+              <a class="idioma-op" href={op.href} hreflang={op.codigo} title={t('nav_idioma_title')}>{op.rotulo}</a>
+            ))}
+          </div>
+          <button id="tema-toggle" class="tema-btn" type="button" aria-label={t('nav_tema_aria')} title={t('nav_tema_title')}>🌙</button>
         </nav>
       </div>
     </header>
@@ -86,7 +119,7 @@ const tarjetaTwitter = imagen ? 'summary' : 'summary_large_image';
 
     <footer class="site-footer">
       <div class="contenedor">
-        Catálogo personal · generado con Astro
+        {t('pie')}
       </div>
     </footer>
     <script>

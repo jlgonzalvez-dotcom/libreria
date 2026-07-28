@@ -1,0 +1,24 @@
+---
+// Páginas de error (404 y 500) con el estilo de la casa, en los dos idiomas.
+import Layout from '../layouts/Layout.astro';
+import { ruta, textos, type Idioma } from '../lib/i18n';
+
+interface Props {
+  lang: Idioma;
+  codigo: '404' | '500';
+}
+const { lang, codigo } = Astro.props;
+const t = textos(lang);
+---
+
+<Layout lang={lang} titulo={t(`titulo_${codigo}`)} descripcion={t(`descripcion_${codigo}`)}>
+  <section class="pagina-error">
+    <div class="contenedor">
+      <p class="error-adorno">✦ ✦ ✦</p>
+      <p class="error-codigo">{codigo}</p>
+      <h1>{t(`h1_${codigo}`)}</h1>
+      <p class="error-texto">{t(`texto_${codigo}`)}</p>
+      <a class="btn" href={ruta(lang, '/')}>{t(`boton_${codigo}`)}</a>
+    </div>
+  </section>
+</Layout>

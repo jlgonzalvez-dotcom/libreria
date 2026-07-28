@@ -1,0 +1,8 @@
+---
+// 404 en inglés. La usan las fichas de /en/libros/… cuando el slug no existe.
+import PaginaError from '../../components/PaginaError.astro';
+
+Astro.response.status = 404;
+---
+
+<PaginaError lang="en" codigo="404" />

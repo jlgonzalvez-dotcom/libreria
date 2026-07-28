@@ -1,23 +1,10 @@
 ---
-import Layout from '../layouts/Layout.astro';
+// 404 general: la sirve Astro para cualquier URL desconocida, así que el idioma
+// se deduce de la propia dirección (/en/loquesea → inglés).
+import PaginaError from '../components/PaginaError.astro';
+import { idiomaDe } from '../lib/i18n';
 
 Astro.response.status = 404;
 ---
 
-<Layout
-  titulo="Página no encontrada — La librería de JL"
-  descripcion="Esta página no está en el catálogo."
->
-  <section class="pagina-error">
-    <div class="contenedor">
-      <p class="error-adorno">✦ ✦ ✦</p>
-      <p class="error-codigo">404</p>
-      <h1>Esta página no está en el catálogo</h1>
-      <p class="error-texto">
-        Puede que el libro ya no esté, que haya cambiado de dirección
-        o que el enlace venga mal escrito.
-      </p>
-      <a class="btn" href="/">Volver al catálogo</a>
-    </div>
-  </section>
-</Layout>
+<PaginaError lang={idiomaDe(Astro.url)} codigo="404" />

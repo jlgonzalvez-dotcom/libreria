@@ -1,24 +1,8 @@
 ---
-import Layout from '../layouts/Layout.astro';
-
 // Página de error del servidor (p. ej. si la base de datos no responde).
 // Debe ser autosuficiente: nada de consultas a la base de datos aquí.
+import PaginaError from '../components/PaginaError.astro';
+import { idiomaDe } from '../lib/i18n';
 ---
 
-<Layout
-  titulo="La librería está cerrada un momento — La librería de JL"
-  descripcion="Ha ocurrido un error temporal. Vuelve a intentarlo en un momento."
->
-  <section class="pagina-error">
-    <div class="contenedor">
-      <p class="error-adorno">✦ ✦ ✦</p>
-      <p class="error-codigo">500</p>
-      <h1>La librería está cerrada un momento</h1>
-      <p class="error-texto">
-        Algo ha fallado al preparar la página. Suele ser cosa de un instante:
-        vuelve a intentarlo recargando, o pasa de nuevo dentro de un rato.
-      </p>
-      <a class="btn" href="/">Volver a intentarlo</a>
-    </div>
-  </section>
-</Layout>
+<PaginaError lang={idiomaDe(Astro.url)} codigo="500" />
