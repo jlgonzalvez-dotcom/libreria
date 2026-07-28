@@ -20,6 +20,13 @@
   --oro-claro:    #d8b87e;  /* dorado claro */
   --verde:        #3f6b54;  /* verde apagado (estado "leído") */
   --azul:         #3a5a78;  /* azul apagado (estado "leyendo") */
+  /* Texto que va ENCIMA del color de acento (botones, chip activo). En día el
+     acento es burdeos oscuro y pide texto blanco; de noche es un coral claro y
+     el blanco se queda en 2,6:1 — por eso esto es una variable, no un #fff. */
+  --acento-texto: #fff;
+  /* Fondo translúcido de la cabecera fija. Debe seguir al tema: si se deja
+     fijo en tono papel, de noche el logotipo queda en 1,2:1 (casi invisible). */
+  --header-bg:    rgba(250, 247, 241, 0.82);
 
   --radio: 12px;
   --radio-sm: 8px;
@@ -40,6 +47,8 @@ html[data-tema="noche"] {
   --linea: #352b1f; --linea-fuerte: #483a28;
   --acento: #db8c6b; --acento-osc: #ecab8b; --acento-claro: #b96a4f;
   --oro: #d6b577; --oro-claro: #ecd4a3; --verde: #71a487; --azul: #6f99b8;
+  --acento-texto: #231a13;               /* tinta oscura sobre el coral claro */
+  --header-bg: rgba(22, 18, 14, 0.86);   /* la cabecera también se hace noche */
   --sombra-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
   --sombra: 0 2px 6px rgba(0, 0, 0, 0.4), 0 14px 30px rgba(0, 0, 0, 0.55);
   --sombra-lg: 0 22px 48px rgba(0, 0, 0, 0.65);
@@ -89,10 +98,21 @@ a:hover { color: var(--acento-osc); }
   padding: 0 28px;
 }
 
+/* ── Saltar al contenido (solo visible al tabular) ────────────────────────── */
+.saltar-contenido {
+  position: absolute; left: 12px; top: -60px; z-index: 100;
+  background: var(--acento); color: var(--acento-texto);
+  padding: 10px 18px; border-radius: 0 0 var(--radio-sm) var(--radio-sm);
+  font-family: var(--sans); font-size: 0.92rem; font-weight: 600;
+  transition: top 0.15s ease;
+}
+.saltar-contenido:focus { top: 0; }
+main:focus { outline: none; }
+
 /* ── Cabecera ─────────────────────────────────────────────────────────────── */
 .site-header {
   border-bottom: 1px solid var(--linea);
-  background: rgba(250, 247, 241, 0.82);
+  background: var(--header-bg);
   backdrop-filter: saturate(1.4) blur(10px);
   position: sticky;
   top: 0;
@@ -118,6 +138,7 @@ a:hover { color: var(--acento-osc); }
   font-weight: 600;
   color: var(--tinta);
   letter-spacing: -0.02em;
+  white-space: nowrap; /* si se parte en tres líneas, la cabecera móvil crece a 166px */
 }
 .logo span { color: var(--acento); font-style: italic; }
 .nav { display: flex; align-items: center; gap: 4px; }
@@ -273,7 +294,7 @@ a:hover { color: var(--acento-osc); }
   transition: all 0.15s ease;
 }
 .chip:hover { border-color: var(--acento-claro); color: var(--acento); }
-.chip.activo { background: var(--acento); border-color: var(--acento); color: #fff; box-shadow: var(--sombra-sm); }
+.chip.activo { background: var(--acento); border-color: var(--acento); color: var(--acento-texto); box-shadow: var(--sombra-sm); }
 
 .contador {
   margin: 0;
@@ -305,6 +326,16 @@ a:hover { color: var(--acento-osc); }
 .libro:hover { transform: translateY(-6px); box-shadow: var(--sombra-lg); }
 .libro a { color: inherit; display: flex; flex-direction: column; height: 100%; }
 .libro a:hover { color: inherit; }
+
+/* El navegador se salta el trazado y la maquetación de las tarjetas que están
+   fuera de pantalla; con 218 libros en una sola página eso es casi todo el
+   catálogo. `contain-intrinsic-size` le da una altura estimada para que la
+   barra de desplazamiento no dé saltos. */
+.libro {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 360px;
+}
+.rejilla.lista .libro { contain-intrinsic-size: auto 96px; }
 
 .libro .portada {
   aspect-ratio: 3 / 4;
@@ -473,7 +504,7 @@ a:hover { color: var(--acento-osc); }
 .btn {
   display: inline-block;
   background: var(--acento);
-  color: #fff;
+  color: var(--acento-texto);
   border: 1px solid var(--acento);
   border-radius: 999px;
   padding: 11px 24px;
@@ -988,9 +1019,24 @@ a.idioma-op:hover { color: var(--acento); }
     padding-top: 52px;
     padding-bottom: 52px;
   }
-  .hero-featured { order: -1; width: min(200px, 56vw); }
+  /* El texto va PRIMERO: antes el mosaico de portadas llevaba `order: -1` y
+     empujaba el H1 fuera del primer viewport, así que quien entraba desde el
+     móvil no leía de qué va la web hasta bajar. */
+  .hero-texto { order: -1; }
+  .hero-featured { width: min(200px, 56vw); }
   .hero-featured .hero-featured-info { display: none; }
-  .hero-estrellas { order: -1; width: min(360px, 84vw); }
+  .hero-estrellas { width: min(360px, 84vw); }
+}
+
+/* ── Cabecera compacta en móvil ───────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .site-header .contenedor { padding-top: 12px; padding-bottom: 12px; }
+  .logo { font-size: 1.15rem; }
+  /* El propio logotipo ya lleva al catálogo: el enlace es redundante y ocupa.
+     Solo en la web pública — el menú del admin sí hace falta entero. */
+  .nav-publica a:not(.idioma-op) { display: none; }
+  .idioma-sel { margin-left: 12px; }
+  .tema-btn { margin-left: 10px; width: 32px; height: 32px; }
 }
 
 @media (max-width: 720px) {

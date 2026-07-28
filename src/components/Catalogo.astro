@@ -1,6 +1,8 @@
 ---
 // Portada del catálogo público. Se usa desde /(español) y /en/(inglés): toda la
 // diferencia está en el idioma que le llega por prop; los datos son los mismos.
+import { Image } from 'astro:assets';
+import { portadaOptimizable } from '../lib/imagenes';
 import Layout from '../layouts/Layout.astro';
 import { listarLibros } from '../lib/libros';
 import { normalizarTexto } from '../lib/similitud';
@@ -90,9 +92,41 @@ function estrellas(n?: number | null) {
   const vacias = '☆'.repeat(5 - Math.round(n));
   return { llenas, vacias };
 }
+
+// Nota sobre las portadas del catálogo: van con UN solo tamaño y sin `srcset`.
+// Con 218 tarjetas, cada URL alternativa se repite 218 veces: al probarlo con
+// srcset el HTML pasó de 182 KB a 347 KB, más de lo que ahorraba. Las 4
+// portadas del hero sí lo llevan, porque son las del LCP y son solo cuatro.
+
+// ── Datos estructurados de la portada (schema.org) ───────────────────────────
+// La portada es una colección de fichas: se declara como CollectionPage con un
+// ItemList. Solo se listan los primeros libros; el catálogo entero ya está en
+// el sitemap y una lista de 218 entradas aquí engordaría el HTML sin aportar.
+const MAX_ITEMLIST = 24;
+const urlBase = new URL(Astro.url.pathname, Astro.site).href;
+const jsonLdColeccion = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: t('titulo_inicio'),
+  description: t('descripcion_inicio'),
+  url: urlBase,
+  inLanguage: lang,
+  isPartOf: { '@type': 'WebSite', name: 'La librería de JL', url: new URL(ruta(lang, '/'), Astro.site).href },
+  mainEntity: {
+    '@type': 'ItemList',
+    numberOfItems: total,
+    itemListElement: libros.slice(0, MAX_ITEMLIST).map((l, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: new URL(ruta(lang, `/libros/${l.slug}/`), Astro.site).href,
+      name: l.titulo,
+    })),
+  },
+};
 ---
 
 <Layout lang={lang} titulo={t('titulo_inicio')} descripcion={t('descripcion_inicio')}>
+  <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLdColeccion)} />
   <section class="hero">
     <div class="contenedor hero-inner">
       <div class="hero-texto">
@@ -112,10 +146,23 @@ function estrellas(n?: number | null) {
               {destacados.map((libro) => (
                 <a class="hero-mini" href={ruta(lang, `/libros/${libro.slug}/`)} title={`${libro.titulo} — ${libro.autor}`}>
                   <div class="hero-mini-cover">
-                    {libro.portada ? (
-                      <img src={libro.portada} alt={t('portada_de', { titulo: libro.titulo })} fetchpriority="high" decoding="async" />
-                    ) : (
+                    {!libro.portada ? (
                       <span>{libro.titulo.charAt(0)}</span>
+                    ) : portadaOptimizable(libro.portada) ? (
+                      <Image
+                        src={libro.portada}
+                        alt={t('portada_de', { titulo: libro.titulo })}
+                        width={240}
+                        height={320}
+                        widths={[160, 240, 480]}
+                        quality={72}
+                        sizes="(max-width: 880px) 40vw, 170px"
+                        fetchpriority="high"
+                        loading="eager"
+                        decoding="async"
+                      />
+                    ) : (
+                      <img src={libro.portada} alt={t('portada_de', { titulo: libro.titulo })} width="240" height="320" fetchpriority="high" decoding="async" />
                     )}
                   </div>
                   <div class="hero-mini-info">
@@ -133,7 +180,7 @@ function estrellas(n?: number | null) {
               <span class="hero-featured-label">{t('destacado')}</span>
               <div class="hero-cover">
                 {fallback.portada ? (
-                  <img src={fallback.portada} alt={t('portada_de', { titulo: fallback.titulo })} />
+                  portadaOptimizable(fallback.portada) ? (<Image src={fallback.portada} alt={t("portada_de", { titulo: fallback.titulo })} width={300} height={400} widths={[200, 300]} quality={78} />) : (<img src={fallback.portada} alt={t("portada_de", { titulo: fallback.titulo })} width="300" height="400" />)
                 ) : (
                   <span>{fallback.titulo.charAt(0)}</span>
                 )}
@@ -155,6 +202,8 @@ function estrellas(n?: number | null) {
       <p
         class="contador"
         id="contador"
+        role="status"
+        aria-live="polite"
         data-uno={t('contador_uno')}
         data-varios={t('contador_varios')}
       >{contarLibros(lang, total)}</p>
@@ -166,19 +215,20 @@ function estrellas(n?: number | null) {
         class="buscador"
         type="search"
         placeholder={t('buscador_placeholder')}
+        aria-label={t('buscador_aria')}
         autocomplete="off"
       />
       <select id="filtro-autor" class="filtro-autor" aria-label={t('filtro_autor_aria')}>
         <option value="*">{t('filtro_autor_todos')}</option>
         {autoresFiltro.map((a) => <option value={a.nombre}>{a.nombre} ({a.n})</option>)}
       </select>
-      <div class="chips" id="chips">
-        <button class="chip activo" data-cat="*">{t('chip_todas')}</button>
-        {categorias.map((c) => <button class="chip" data-cat={c.valor}>{c.rotulo}</button>)}
+      <div class="chips" id="chips" role="group" aria-label={t('chips_aria')}>
+        <button class="chip activo" type="button" aria-pressed="true" data-cat="*">{t('chip_todas')}</button>
+        {categorias.map((c) => <button class="chip" type="button" aria-pressed="false" data-cat={c.valor}>{c.rotulo}</button>)}
       </div>
       <div class="vista-toggle" id="vista-toggle" role="group" aria-label={t('vista_aria')}>
-        <button class="vista-btn activo" data-vista="rejilla" type="button" aria-label={t('vista_rejilla')} title={t('vista_rejilla_title')}>▦</button>
-        <button class="vista-btn" data-vista="lista" type="button" aria-label={t('vista_lista')} title={t('vista_lista_title')}>☰</button>
+        <button class="vista-btn activo" data-vista="rejilla" type="button" aria-pressed="true" aria-label={t('vista_rejilla')} title={t('vista_rejilla_title')}>▦</button>
+        <button class="vista-btn" data-vista="lista" type="button" aria-pressed="false" aria-label={t('vista_lista')} title={t('vista_lista_title')}>☰</button>
       </div>
     </div>
 
@@ -194,7 +244,19 @@ function estrellas(n?: number | null) {
               <article class="libro" data-categoria={libro.categoria} data-autor={libro.autor} data-busqueda={busqueda}>
                 <a href={ruta(lang, `/libros/${libro.slug}/`)}>
                   <div class="portada">
-                    {libro.portada ? <img src={libro.portada} alt={t('portada_de', { titulo: libro.titulo })} loading="lazy" decoding="async" /> : libro.titulo.charAt(0)}
+                    {!libro.portada ? libro.titulo.charAt(0) : portadaOptimizable(libro.portada) ? (
+                      <Image
+                        src={libro.portada}
+                        alt={t('portada_de', { titulo: libro.titulo })}
+                        width={320}
+                        height={427}
+                        quality={70}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <img src={libro.portada} alt={t('portada_de', { titulo: libro.titulo })} width="320" height="427" loading="lazy" decoding="async" />
+                    )}
                     {libro.destacado && <span class="cinta">{t('destacado')}</span>}
                   </div>
                   <div class="cuerpo">
@@ -306,9 +368,8 @@ function estrellas(n?: number | null) {
   chips?.addEventListener('click', (e) => {
     const btn = (e.target as HTMLElement).closest('.chip') as HTMLElement | null;
     if (!btn) return;
-    chips.querySelectorAll('.chip').forEach((c) => c.classList.remove('activo'));
-    btn.classList.add('activo');
     categoria = btn.dataset.cat ?? '*';
+    activarChip(categoria);
     aplicar();
   });
 
@@ -323,9 +384,11 @@ function estrellas(n?: number | null) {
   function setVista(v: string) {
     if (!rejilla || !vistaToggle) return;
     rejilla.classList.toggle('lista', v === 'lista');
-    vistaToggle.querySelectorAll<HTMLElement>('.vista-btn').forEach((b) =>
-      b.classList.toggle('activo', b.dataset.vista === v),
-    );
+    vistaToggle.querySelectorAll<HTMLElement>('.vista-btn').forEach((b) => {
+      const activo = b.dataset.vista === v;
+      b.classList.toggle('activo', activo);
+      b.setAttribute('aria-pressed', String(activo)); // el estado, para lectores de pantalla
+    });
     try { localStorage.setItem('vista', v); } catch (e) {}
   }
   vistaToggle?.addEventListener('click', (e) => {
@@ -340,33 +403,63 @@ function estrellas(n?: number | null) {
   const modal = document.getElementById('modal-grafico');
   const panelCat = document.getElementById('panel-categorias');
   const panelAut = document.getElementById('panel-autores');
-  function abrirModal(tipo: string) {
+  const btnCerrarModal = modal?.querySelector<HTMLElement>('.modal-cerrar');
+  // Lo que hay detrás del modal: mientras está abierto se marca `inert`, así el
+  // tabulador y los lectores de pantalla no se cuelan al fondo.
+  const fondoInerte = () =>
+    Array.from(document.querySelectorAll<HTMLElement>('.site-header, .site-footer, .hero, .catalogo'));
+  let abridor: HTMLElement | null = null; // a quién le devolvemos el foco al cerrar
+
+  function abrirModal(tipo: string, desde?: HTMLElement) {
     if (!modal || !panelCat || !panelAut) return;
+    abridor = desde ?? (document.activeElement as HTMLElement | null);
     panelCat.hidden = tipo !== 'categorias';
     panelAut.hidden = tipo !== 'autores';
     modal.hidden = false;
     document.body.style.overflow = 'hidden';
+    fondoInerte().forEach((el) => el.setAttribute('inert', ''));
+    btnCerrarModal?.focus();
   }
+
   function cerrarModal() {
-    if (!modal) return;
+    if (!modal || modal.hidden) return;
     modal.hidden = true;
     document.body.style.overflow = '';
+    fondoInerte().forEach((el) => el.removeAttribute('inert'));
+    abridor?.focus(); // el foco vuelve al botón que lo abrió, no al principio
+    abridor = null;
   }
+
   document.querySelectorAll<HTMLElement>('.stat').forEach((b) =>
     b.addEventListener('click', () => {
       const t = b.dataset.stat;
       if (t === 'catalogo') document.querySelector('.catalogo')?.scrollIntoView({ behavior: 'smooth' });
-      else if (t) abrirModal(t);
+      else if (t) abrirModal(t, b);
     }),
   );
   modal?.querySelectorAll('[data-cerrar]').forEach((el) => el.addEventListener('click', cerrarModal));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarModal(); });
 
+  // Encierro del tabulador dentro del modal (respaldo para navegadores sin `inert`).
+  const FOCUSABLES = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  modal?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab' || modal.hidden) return;
+    const visibles = Array.from(modal.querySelectorAll<HTMLElement>(FOCUSABLES))
+      .filter((el) => el.offsetParent !== null);
+    if (visibles.length === 0) return;
+    const primero = visibles[0];
+    const ultimo = visibles[visibles.length - 1];
+    if (e.shiftKey && document.activeElement === primero) { e.preventDefault(); ultimo.focus(); }
+    else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primero.focus(); }
+  });
+
   // ── De los gráficos al catálogo: clicar una categoría o un autor filtra ────
   function activarChip(cat: string) {
-    chips?.querySelectorAll<HTMLElement>('.chip').forEach((c) =>
-      c.classList.toggle('activo', (c.dataset.cat ?? '*') === cat),
-    );
+    chips?.querySelectorAll<HTMLElement>('.chip').forEach((c) => {
+      const activo = (c.dataset.cat ?? '*') === cat;
+      c.classList.toggle('activo', activo);
+      c.setAttribute('aria-pressed', String(activo));
+    });
   }
   function bajarAlCatalogo() {
     cerrarModal();

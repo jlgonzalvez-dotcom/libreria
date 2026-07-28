@@ -5,7 +5,7 @@ import { marked } from 'marked';
 import Layout from '../layouts/Layout.astro';
 import type { Libro } from '../lib/libros';
 import {
-  categoriaEn, conservacionEn, formatoEn, idiomaLibroEn, ordinalEdicion, ruta, textos,
+  categoriaEn, codigoIdioma, conservacionEn, formatoEn, idiomaLibroEn, ordinalEdicion, ruta, textos,
   type Idioma,
 } from '../lib/i18n';
 
@@ -71,7 +71,8 @@ const jsonLd = {
   '@type': 'Book',
   name: libro.titulo,
   author: [libro.autor, ...libro.autores_extra].map((n) => ({ '@type': tipoAutor(n), name: n })),
-  inLanguage: libro.idioma,
+  // schema.org espera un código BCP 47 ("es"), no el nombre del idioma.
+  ...(codigoIdioma(libro.idioma) && { inLanguage: codigoIdioma(libro.idioma) }),
   url: new URL(Astro.url.pathname, Astro.site).href,
   ...(libro.isbn && { isbn: libro.isbn }),
   ...(libro.paginas && { numberOfPages: libro.paginas }),
@@ -107,7 +108,7 @@ const jsonLd = {
 
       <div class="grid">
         <div class="portada-grande">
-          {libro.portada ? <img src={libro.portada} alt={t('portada_de', { titulo: libro.titulo })} fetchpriority="high" /> : libro.titulo.charAt(0)}
+          {libro.portada ? <img src={libro.portada} alt={t('portada_de', { titulo: libro.titulo })} width="600" height="800" fetchpriority="high" /> : libro.titulo.charAt(0)}
         </div>
 
         <div>
@@ -154,7 +155,7 @@ const jsonLd = {
             {delAutor.map((l) => (
               <a class="rel-libro" href={ruta(lang, `/libros/${l.slug}/`)} title={`${l.titulo} — ${l.autor}`}>
                 <div class="rel-cover">
-                  {l.portada ? <img src={l.portada} alt={t('portada_de', { titulo: l.titulo })} loading="lazy" decoding="async" /> : <span>{l.titulo.charAt(0)}</span>}
+                  {l.portada ? <img src={l.portada} alt={t('portada_de', { titulo: l.titulo })} width="300" height="400" loading="lazy" decoding="async" /> : <span>{l.titulo.charAt(0)}</span>}
                 </div>
                 <strong>{l.titulo}</strong>
               </a>
@@ -170,7 +171,7 @@ const jsonLd = {
             {deCategoria.map((l) => (
               <a class="rel-libro" href={ruta(lang, `/libros/${l.slug}/`)} title={`${l.titulo} — ${l.autor}`}>
                 <div class="rel-cover">
-                  {l.portada ? <img src={l.portada} alt={t('portada_de', { titulo: l.titulo })} loading="lazy" decoding="async" /> : <span>{l.titulo.charAt(0)}</span>}
+                  {l.portada ? <img src={l.portada} alt={t('portada_de', { titulo: l.titulo })} width="300" height="400" loading="lazy" decoding="async" /> : <span>{l.titulo.charAt(0)}</span>}
                 </div>
                 <strong>{l.titulo}</strong>
                 <em>{l.autor}</em>

@@ -49,8 +49,11 @@ export const LOCALE: Record<Idioma, string> = { es: 'es_ES', en: 'en_US' };
 const ES = {
   // Cabecera, pie y navegación
   nav_catalogo: 'Catálogo',
+  saltar_contenido: 'Saltar al contenido',
   nav_tema_aria: 'Cambiar entre modo día y noche',
   nav_tema_title: 'Modo día / noche',
+  tema_a_noche: 'Activar el modo noche',
+  tema_a_dia: 'Activar el modo día',
   nav_idioma_aria: 'Idioma',
   nav_idioma_title: 'Ver esta página en inglés',
   pie: 'Catálogo personal · generado con Astro',
@@ -76,9 +79,11 @@ const ES = {
   contador_uno: '{n} libro',
   contador_varios: '{n} libros',
   buscador_placeholder: 'Buscar por título, autor o etiqueta…',
+  buscador_aria: 'Buscar en el catálogo',
   filtro_autor_todos: 'Todos los autores',
   filtro_autor_aria: 'Filtrar por autor',
   chip_todas: 'Todas',
+  chips_aria: 'Filtrar por categoría',
   vista_aria: 'Modo de vista',
   vista_rejilla: 'Ver en rejilla',
   vista_rejilla_title: 'Rejilla',
@@ -135,8 +140,11 @@ export type ClaveTexto = keyof typeof ES;
 
 const EN: Record<ClaveTexto, string> = {
   nav_catalogo: 'Catalog',
+  saltar_contenido: 'Skip to content',
   nav_tema_aria: 'Switch between light and dark mode',
   nav_tema_title: 'Light / dark mode',
+  tema_a_noche: 'Switch to dark mode',
+  tema_a_dia: 'Switch to light mode',
   nav_idioma_aria: 'Language',
   nav_idioma_title: 'Ver esta página en español',
   pie: 'A personal book catalog · built with Astro',
@@ -160,9 +168,11 @@ const EN: Record<ClaveTexto, string> = {
   contador_uno: '{n} book',
   contador_varios: '{n} books',
   buscador_placeholder: 'Search by title, author or tag…',
+  buscador_aria: 'Search the catalog',
   filtro_autor_todos: 'All authors',
   filtro_autor_aria: 'Filter by author',
   chip_todas: 'All',
+  chips_aria: 'Filter by category',
   vista_aria: 'View mode',
   vista_rejilla: 'Grid view',
   vista_rejilla_title: 'Grid',
@@ -299,6 +309,20 @@ export const categoriaEn = (v: string, lang: Idioma) => traducirValor(CATEGORIAS
 export const idiomaLibroEn = (v: string, lang: Idioma) => traducirValor(IDIOMAS_EN, v, lang);
 export const formatoEn = (v: string, lang: Idioma) => traducirValor(FORMATOS_EN, v, lang);
 export const conservacionEn = (v: string, lang: Idioma) => traducirValor(CONSERVACION_EN, v, lang);
+
+// Códigos BCP 47 del idioma del ejemplar, para los datos estructurados de
+// Google (schema.org espera "es", no "Español").
+const CODIGOS_IDIOMA: Record<string, string> = {
+  'Español': 'es', 'Inglés': 'en', 'Francés': 'fr', 'Italiano': 'it',
+  'Alemán': 'de', 'Portugués': 'pt', 'Catalán': 'ca', 'Gallego': 'gl',
+  'Euskera': 'eu', 'Latín': 'la',
+};
+
+/** "Español" → "es". Si el idioma no está en la tabla, devuelve null (mejor
+ *  omitir el campo que darle a Google un valor que no entiende). */
+export function codigoIdioma(nombre?: string | null): string | null {
+  return CODIGOS_IDIOMA[(nombre ?? '').trim()] ?? null;
+}
 
 /** Ordinal de la edición: "3ª" en español, "3rd" en inglés. */
 export function ordinalEdicion(n: number, lang: Idioma): string {

@@ -12,7 +12,32 @@ export default defineConfig({
   output: 'server',
   // maxDuration: la generación de sinopsis (fuentes + IA) puede pasar de los
   // 10 s por defecto de las funciones de Vercel; les damos hasta 60 s.
-  adapter: vercel({ maxDuration: 60 }),
+  // imageService: las portadas se sirven a través de la optimización de
+  // imágenes de Vercel (AVIF/WebP y varios anchos). Sin esto se descargaban las
+  // originales de 1200 px —de 150 a 500 KB— para pintarlas a 200 px, que era la
+  // causa del LCP de 12,5 s en móvil. Supabase también sabe redimensionar, pero
+  // solo en su plan de pago.
+  adapter: vercel({
+    maxDuration: 60,
+    imageService: true,
+    imagesConfig: {
+      sizes: [96, 160, 240, 320, 480, 640, 900],
+      domains: [],
+      remotePatterns: [
+        { protocol: 'https', hostname: 'tetezdhsxshxhneknxnp.supabase.co' },
+      ],
+      formats: ['image/avif', 'image/webp'],
+      minimumCacheTTL: 60 * 60 * 24 * 30,
+    },
+  }),
+
+  // Dominios de los que se aceptan imágenes remotas para optimizar.
+  // Debe coincidir con la lista de src/lib/imagenes.ts.
+  image: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'tetezdhsxshxhneknxnp.supabase.co' },
+    ],
+  },
 
   // Astro activa por defecto una comprobación anti-CSRF por Origin que, tras el
   // proxy de Vercel, rechaza todos los POST de formularios (403). La desactivamos:

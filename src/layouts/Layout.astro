@@ -11,6 +11,8 @@ interface Props {
   tipo?: 'website' | 'book';
   /** Idioma de la página. Por defecto, el que indica la URL (/en/… → inglés). */
   lang?: Idioma;
+  /** Texto alternativo de la imagen para compartir. */
+  imagenAlt?: string;
 }
 
 const {
@@ -44,6 +46,9 @@ const opcionesIdioma = (['es', 'en'] as const).map((codigo) => ({
 // pequeña ("summary"); el cartel es apaisado → tarjeta grande.
 const imagenOg = new URL(imagen ?? '/og-portada.png', Astro.site).href;
 const tarjetaTwitter = imagen ? 'summary' : 'summary_large_image';
+// Texto alternativo de la vista previa: la portada del libro lleva su propio
+// alt desde la ficha; el cartel genérico describe la web.
+const imagenAlt = Astro.props.imagenAlt ?? (imagen ? titulo : 'La librería de JL');
 ---
 
 <!doctype html>
@@ -69,6 +74,8 @@ const tarjetaTwitter = imagen ? 'summary' : 'summary_large_image';
     <meta property="og:title" content={titulo} />
     <meta property="og:description" content={descripcion} />
     <meta property="og:image" content={imagenOg} />
+    <meta property="og:image:alt" content={imagenAlt} />
+    {!imagen && (<><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /></>)}
     <meta name="twitter:card" content={tarjetaTwitter} />
     <meta name="twitter:title" content={titulo} />
     <meta name="twitter:description" content={descripcion} />
@@ -96,10 +103,11 @@ const tarjetaTwitter = imagen ? 'summary' : 'summary_large_image';
     </script>
   </head>
   <body>
+    <a class="saltar-contenido" href="#contenido">{t('saltar_contenido')}</a>
     <header class="site-header">
       <div class="contenedor">
         <a href={ruta(lang, '/')} class="logo">La librería de <span>JL</span></a>
-        <nav class="nav">
+        <nav class="nav nav-publica">
           <a href={ruta(lang, '/')}>{t('nav_catalogo')}</a>
           <div class="idioma-sel" role="group" aria-label={t('nav_idioma_aria')}>
             {opcionesIdioma.map((op) => op.actual ? (
@@ -108,12 +116,21 @@ const tarjetaTwitter = imagen ? 'summary' : 'summary_large_image';
               <a class="idioma-op" href={op.href} hreflang={op.codigo} title={t('nav_idioma_title')}>{op.rotulo}</a>
             ))}
           </div>
-          <button id="tema-toggle" class="tema-btn" type="button" aria-label={t('nav_tema_aria')} title={t('nav_tema_title')}>🌙</button>
+          <button
+            id="tema-toggle"
+            class="tema-btn"
+            type="button"
+            aria-pressed="false"
+            aria-label={t('tema_a_noche')}
+            title={t('nav_tema_title')}
+            data-a-noche={t('tema_a_noche')}
+            data-a-dia={t('tema_a_dia')}
+          >🌙</button>
         </nav>
       </div>
     </header>
 
-    <main>
+    <main id="contenido" tabindex="-1">
       <slot />
     </main>
 
@@ -128,7 +145,16 @@ const tarjetaTwitter = imagen ? 'summary' : 'summary_large_image';
       (function () {
         const btn = document.getElementById('tema-toggle');
         let actual = document.documentElement.getAttribute('data-tema') === 'noche' ? 'noche' : 'dia';
-        const pintar = () => { if (btn) btn.textContent = actual === 'noche' ? '☀️' : '🌙'; };
+        // El botón dice a qué modo lleva (no en cuál estás) y expone su estado
+        // con aria-pressed, para que un lector de pantalla lo anuncie bien.
+        const pintar = () => {
+          if (!btn) return;
+          const noche = actual === 'noche';
+          btn.textContent = noche ? '☀️' : '🌙';
+          btn.setAttribute('aria-pressed', String(noche));
+          const etiqueta = noche ? btn.dataset.aDia : btn.dataset.aNoche;
+          if (etiqueta) btn.setAttribute('aria-label', etiqueta);
+        };
         pintar();
         btn?.addEventListener('click', () => {
           actual = actual === 'noche' ? 'dia' : 'noche';
