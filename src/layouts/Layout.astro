@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { idiomaDe, rutaEnIdioma, ruta, textos, LOCALE, type Idioma } from '../lib/i18n';
+import { URL_FUENTES } from '../lib/fuentes';
 
 interface Props {
   titulo?: string;
@@ -86,10 +87,13 @@ const imagenAlt = Astro.props.imagenAlt ?? (imagen ? titulo : 'La librería de J
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%93%9A%3C/text%3E%3C/svg%3E" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    {/* La hoja de fuentes de Google bloqueaba el pintado 3 s en móvil. Se carga
+        con media="print" (que no bloquea) y se activa al terminar de bajar; el
+        texto se ve antes con Georgia/system-ui y cambia a Fraunces/Inter al
+        llegar. El <noscript> cubre a quien tenga el JavaScript desactivado. */}
+    <link rel="preload" as="style" href={URL_FUENTES} />
+    <link rel="stylesheet" href={URL_FUENTES} media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href={URL_FUENTES} /></noscript>
     <script is:inline>
       // Aplica el tema guardado ANTES de pintar, para que no parpadee.
       (function () {
