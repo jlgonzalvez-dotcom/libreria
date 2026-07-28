@@ -27,6 +27,11 @@
   /* Fondo translúcido de la cabecera fija. Debe seguir al tema: si se deja
      fijo en tono papel, de noche el logotipo queda en 1,2:1 (casi invisible). */
   --header-bg:    rgba(250, 247, 241, 0.82);
+  /* Degradado del hero. Mismo motivo que la cabecera: si se deja en tonos
+     crema fijos, de noche pinta un fondo claro bajo un titular claro. */
+  --hero-halo:    #fff8ea;
+  --hero-halo-0:  rgba(255, 248, 234, 0);
+  --hero-alto:    #fbf6ec;
 
   --radio: 12px;
   --radio-sm: 8px;
@@ -49,6 +54,7 @@ html[data-tema="noche"] {
   --oro: #d6b577; --oro-claro: #ecd4a3; --verde: #71a487; --azul: #6f99b8;
   --acento-texto: #231a13;               /* tinta oscura sobre el coral claro */
   --header-bg: rgba(22, 18, 14, 0.86);   /* la cabecera también se hace noche */
+  --hero-halo: #33281a; --hero-halo-0: rgba(51, 40, 26, 0); --hero-alto: #1e1710;
   --sombra-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
   --sombra: 0 2px 6px rgba(0, 0, 0, 0.4), 0 14px 30px rgba(0, 0, 0, 0.55);
   --sombra-lg: 0 22px 48px rgba(0, 0, 0, 0.65);
@@ -150,8 +156,8 @@ main:focus { outline: none; }
   position: relative;
   border-bottom: 1px solid var(--linea);
   background:
-    radial-gradient(900px 460px at 14% -160px, #fff8ea 0%, rgba(255, 248, 234, 0) 70%),
-    linear-gradient(180deg, #fbf6ec 0%, var(--papel) 100%);
+    radial-gradient(900px 460px at 14% -160px, var(--hero-halo) 0%, var(--hero-halo-0) 70%),
+    linear-gradient(180deg, var(--hero-alto) 0%, var(--papel) 100%);
   overflow: hidden;
 }
 .hero-inner {
