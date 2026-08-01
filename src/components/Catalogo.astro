@@ -281,7 +281,10 @@ const jsonLdColeccion = {
                       )}
                     </div>
                     <div class="meta">
-                      {libro.anio && <span class="badge">{libro.anio}</span>}
+                      {/* Año de publicación (el de la edición); si no consta, el de impresión. */}
+                      {(libro.anio_publicacion ?? libro.anio) && (
+                        <span class="badge">{libro.anio_publicacion ?? libro.anio}</span>
+                      )}
                     </div>
                   </div>
                 </a>
