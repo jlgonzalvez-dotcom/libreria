@@ -283,6 +283,7 @@ const IDIOMAS_EN: Record<string, string> = {
   'Alemán': 'German',
   'Portugués': 'Portuguese',
   'Catalán': 'Catalan',
+  'Valenciano': 'Valencian',
   'Gallego': 'Galician',
   'Euskera': 'Basque',
   'Latín': 'Latin',
@@ -316,6 +317,9 @@ const CODIGOS_IDIOMA: Record<string, string> = {
   'Español': 'es', 'Inglés': 'en', 'Francés': 'fr', 'Italiano': 'it',
   'Alemán': 'de', 'Portugués': 'pt', 'Catalán': 'ca', 'Gallego': 'gl',
   'Euskera': 'eu', 'Latín': 'la',
+  // "ca-valencia" es la variante del catalán registrada en BCP 47 para el
+  // valenciano; es lo que entienden Google y schema.org.
+  'Valenciano': 'ca-valencia',
 };
 
 /** "Español" → "es". Si el idioma no está en la tabla, devuelve null (mejor

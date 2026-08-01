@@ -22,7 +22,7 @@ export const CATEGORIAS_SUGERIDAS = [
 
 export const IDIOMAS = [
   'Español', 'Inglés', 'Francés', 'Italiano', 'Alemán',
-  'Portugués', 'Catalán', 'Gallego', 'Euskera', 'Latín',
+  'Portugués', 'Catalán', 'Valenciano', 'Gallego', 'Euskera', 'Latín',
 ];
 
 // ─── Helpers de slug ─────────────────────────────────────────────────────────
