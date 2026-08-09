@@ -23,6 +23,9 @@ pnpm-debug.log*
 .env.production
 .env.*.local
 
+# copias de seguridad del catálogo (CSV de /admin/exportar)
+copias/
+
 # macOS
 .DS_Store
 
