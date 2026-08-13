@@ -36,3 +36,6 @@ copias/
 
 # Python
 __pycache__/
+
+# Configuración local de Claude Code (personal, no va al repo)
+.claude/
