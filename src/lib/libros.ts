@@ -9,7 +9,7 @@ export type LibroUpdate = Database['public']['Tables']['libros']['Update'];
 // ─── Opciones para los desplegables del formulario /admin ────────────────────
 // Los enums fijos coinciden con los CHECK de la base de datos.
 export const ESTADOS = ['pendiente', 'leyendo', 'leído', 'consulta'] as const;
-export const FORMATOS = ['papel', 'digital', 'audiolibro'] as const;
+export const FORMATOS = ['papel', 'digital', 'audiolibro', 'fotocopia'] as const;
 export const ESTADOS_CONSERVACION = ['nuevo', 'como nuevo', 'bueno', 'aceptable'] as const;
 
 // Categorías sugeridas (el campo admite también escribir una nueva, vía datalist).

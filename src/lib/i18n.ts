@@ -296,6 +296,7 @@ const FORMATOS_EN: Record<string, string> = {
   'papel': 'paper',
   'digital': 'digital',
   'audiolibro': 'audiobook',
+  'fotocopia': 'photocopy',
 };
 
 const CONSERVACION_EN: Record<string, string> = {
