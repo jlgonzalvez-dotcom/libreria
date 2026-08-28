@@ -268,6 +268,7 @@ const CATEGORIAS_EN: Record<string, string> = {
   'Infantil-juvenil': "Children's & young adult",
   'Libro de texto': 'Textbooks',
   'Matemáticas': 'Mathematics',
+  'Cocina': 'Cooking',
   'Medicina': 'Medicine',
   'Narrativa': 'Fiction',
   'Novela biográfica': 'Biographical fiction',
