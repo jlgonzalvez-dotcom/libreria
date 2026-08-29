@@ -1,7 +1,6 @@
 ---
 // Ficha de un libro. Se usa desde /libros/[slug]/ (español) y /en/libros/[slug]/
 // (inglés). La página es quien busca el libro y decide el 404; aquí solo se pinta.
-import { marked } from 'marked';
 import Layout from '../layouts/Layout.astro';
 import type { Libro } from '../lib/libros';
 import { distintivoEdicion, titulosRepetidos } from '../lib/ediciones';
@@ -37,8 +36,8 @@ const tituloPagina = edicion ? `${libro.titulo} (${edicion})` : libro.titulo;
 const sinopsis = lang === 'en' ? (libro.sinopsis_en || libro.sinopsis) : libro.sinopsis;
 const sinopsisSinTraducir = lang === 'en' && !libro.sinopsis_en && Boolean(libro.sinopsis);
 
-// Las notas se escriben en Markdown desde el panel /admin (contenido propio).
-const notasHtml = libro.notas ? marked.parse(libro.notas) : '';
+// Las notas NO se publican: son dato interno de catalogación (procedencia,
+// créditos, dedicatorias, discrepancias entre fuentes). Solo se ven en /admin.
 
 // ── Relacionados: más del mismo autor y más de la misma categoría ────────────
 const MAX_RELACIONADOS = 6;
@@ -151,7 +150,6 @@ const jsonLd = {
             </dl>
           </div>
 
-          {notasHtml && <div class="cuerpo-md" set:html={notasHtml} />}
         </div>
       </div>
 
