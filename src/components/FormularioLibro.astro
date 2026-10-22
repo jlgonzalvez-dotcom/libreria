@@ -673,7 +673,7 @@ const categoriaPersonalizada = v.categoria !== '' && !categorias.includes(v.cate
       });
 
       // Líneas legibles, de la más larga a la más corta (la más larga suele ser el título).
-      const lineas = (data.text || '')
+      const lineas = String(data.text || '')
         .split('\n')
         .map((s) => s.trim())
         .filter((s) => s.replace(/[^\p{L}]/gu, '').length >= 4)

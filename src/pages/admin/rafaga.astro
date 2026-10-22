@@ -149,11 +149,15 @@ const datosClienteJson = JSON.stringify(datosCliente).replace(/</g, '\\u003c');
     actualizarBarra();
   }
 
+  function escapeHtml(valor: string): string {
+    return valor.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   function opcionesCategoria(seleccionada: string): string {
     const opciones = ['<option value="">Sin categoría</option>'];
     for (const c of datos.categorias) {
       const sel = c === seleccionada ? ' selected' : '';
-      opciones.push(`<option value="${c.replace(/"/g, '&quot;')}"${sel}>${c}</option>`);
+      opciones.push(`<option value="${escapeHtml(c)}"${sel}>${escapeHtml(c)}</option>`);
     }
     return opciones.join('');
   }
@@ -225,7 +229,13 @@ const datosClienteJson = JSON.stringify(datosCliente).replace(/</g, '\\u003c');
       if (cat && propuesta) cat.value = propuesta;
       if (data.portada) {
         const thumb = item.fila.querySelector('.raf-thumb');
-        if (thumb) thumb.innerHTML = `<img src="${data.portada}" alt="" loading="lazy" />`;
+        if (thumb && /^https:\/\//.test(data.portada)) {
+          const imagen = document.createElement('img');
+          imagen.src = data.portada;
+          imagen.alt = '';
+          imagen.loading = 'lazy';
+          thumb.replaceChildren(imagen);
+        }
       }
       const meta = item.fila.querySelector('.raf-meta') as HTMLElement | null;
       if (meta) {

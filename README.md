@@ -1,71 +1,67 @@
-# Mi Librería — catálogo de la biblioteca personal
+# La librería de JL
 
-Web-catálogo de **todos mis libros, bien clasificados**. Construida con
-[Astro](https://astro.build). Pensada para crecer: hoy es un escaparate/catálogo;
-más adelante puede incorporar venta de libros usados, reseñas y comentarios
-(el modelo de datos ya reserva campos para ello).
+Catálogo de una biblioteca personal construido con **Astro**, **Supabase** y **Vercel**.
 
-## Cómo añadir un libro
+[Ver el catálogo](https://lalibreriadejl.vercel.app)
 
-Cada libro es un archivo de texto (`.md`) dentro de `src/content/libros/`.
-Copia uno existente, renómbralo (sin tildes ni espacios, usa guiones) y edita
-los datos de la cabecera. Ejemplo mínimo:
+## Funciones
 
-```markdown
----
-titulo: "El nombre del libro"
-autor: "Nombre del autor"
-categoria: "Narrativa"          # categoría principal (1 sola)
-subcategorias: ["Novela"]        # géneros secundarios (opcional)
-etiquetas: ["aventuras"]          # etiquetas de búsqueda (opcional)
-anio: 2020
-idioma: "Español"
-editorial: "Editorial"
-paginas: 320
-estado: "leído"                  # leído | leyendo | pendiente | consulta
-valoracion: 4                     # 0 a 5 estrellas
-ubicacion: "Salón — estantería A"
-formato: "papel"                 # papel | digital | audiolibro
-portada: "/portadas/mi-libro.jpg" # opcional; si no, se muestra la inicial
-destacado: false
----
+- Catálogo en español e inglés, con búsqueda y filtros por autor y categoría.
+- Fichas de libros, sinopsis, portadas, valoraciones y ediciones relacionadas.
+- Panel privado para catalogar libros, escanear ISBN y gestionar inventario y préstamos.
+- Exportación del catálogo y copias de seguridad privadas.
 
-Aquí van tus notas o reseña del libro (admite Markdown).
+Las páginas se generan en el servidor. Los datos del catálogo viven en Supabase;
+las ubicaciones físicas, préstamos y notas internas quedan reservados al panel.
+Las consultas públicas seleccionan únicamente los campos destinados al catálogo.
+
+## Desarrollo local
+
+Se necesita Node.js 22.16 o posterior; para producción se recomienda Node.js 24.
+
+```sh
+npm ci
+cp .env.example .env
+# Rellena .env con las credenciales de tu propio proyecto.
+npm run setup:hooks
+npm run dev
 ```
 
-Campos para el **futuro uso comercial** (opcionales, vacíos hasta que los uses):
-`en_venta`, `precio`, `estado_conservacion`, `resena`.
+No publiques el archivo `.env` ni una clave `service_role`. El cliente de Supabase
+se usa exclusivamente desde el servidor. Activa RLS y restringe los permisos
+de los roles públicos en Supabase; una comprobación del código no sustituye
+la revisión de los permisos de la base de datos desplegada.
 
-### Portadas
-Pon las imágenes de portada en `public/portadas/` y referéncialas como
-`portada: "/portadas/nombre.jpg"`. Si un libro no tiene portada, se muestra
-una tarjeta con la inicial del título.
+## Comprobaciones
 
-## Cómo ver la web en tu ordenador
-
-```bash
-npm install      # solo la primera vez
-npm run dev      # abre http://localhost:4321
+```sh
+npm test
+npm run check
+npm run test:integration  # requiere Python 3; usa datos ficticios en localhost
+npm run privacy
+npm audit
+npm run build
 ```
 
-## Cómo publicarla en internet (cuando quieras)
+## Inventario privado
 
-```bash
-npm run build    # genera la web en la carpeta dist/
-```
+Los inventarios y las notas personales se guardan fuera del repositorio.
+`scripts/inventario-cajas.py` mantiene el Excel y su CSV de recuperación en
+`~/.local/share/libreria/`, salvo que se configuren `LIBRERIA_DATOS_PRIVADOS`
+o `LIBRERIA_INVENTARIO_EXCEL`. Conserva una copia del Excel anterior antes de
+regenerarlo. Los datos personales nunca deben incluirse en documentación,
+mensajes de commits, capturas ni ejemplos públicos.
 
-`dist/` se puede subir gratis a Vercel o Netlify; cada cambio que guardes en el
-repositorio se publica solo.
+La contraseña del panel debe ser larga y exclusiva. En producción conviene
+configurar además un límite de intentos en el firewall de Vercel. Cambiar
+la contraseña invalida las sesiones firmadas previamente.
 
 ## Estructura
 
-```
-src/
-├── content/libros/      ← un .md por cada libro (aquí vive tu catálogo)
-├── content.config.ts    ← define los campos de clasificación de cada libro
-├── layouts/Layout.astro ← cabecera, pie y estilos comunes
-├── pages/
-│   ├── index.astro       ← catálogo con buscador y filtros por categoría
-│   └── libros/[slug].astro ← ficha de detalle de cada libro
-└── styles/global.css     ← estética (paleta, tipografías)
+```text
+src/components/    Catálogo, fichas y formulario de administración
+src/pages/         Páginas públicas, panel privado y endpoints
+src/lib/           Acceso a datos y lógica del catálogo
+scripts/           Herramientas locales de inventario y copias
+tests/             Pruebas de las protecciones de seguridad
 ```

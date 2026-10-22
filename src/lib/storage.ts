@@ -1,4 +1,6 @@
 import { supabase } from './supabase';
+import { SUPABASE_URL } from 'astro:env/server';
+import { portadaExternaPermitida } from './seguridad';
 
 const BUCKET = 'portadas';
 
@@ -12,7 +14,11 @@ const EXT: Record<string, string> = {
 
 /** ¿La URL ya apunta a nuestro propio almacén de portadas? */
 export function esPortadaPropia(url: string): boolean {
-  return url.includes(`/storage/v1/object/public/${BUCKET}/`);
+  try {
+    const parsed = new URL(url);
+    return parsed.origin === new URL(SUPABASE_URL).origin &&
+      parsed.pathname.startsWith(`/storage/v1/object/public/${BUCKET}/`);
+  } catch { return false; }
 }
 
 /**
@@ -22,16 +28,45 @@ export function esPortadaPropia(url: string): boolean {
  * externa: mejor una portada frágil que ninguna).
  */
 export async function guardarPortadaDesdeUrl(url: string): Promise<string | null> {
+  if (!portadaExternaPermitida(url)) return null;
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 8000);
   try {
-    const ac = new AbortController();
-    const t = setTimeout(() => ac.abort(), 8000);
-    const res = await fetch(url, { signal: ac.signal }).finally(() => clearTimeout(t));
+    let actual = url;
+    let res: Response | undefined;
+    for (let salto = 0; salto < 4; salto++) {
+      if (!portadaExternaPermitida(actual)) return null;
+      res = await fetch(actual, { signal: ac.signal, redirect: 'manual' });
+      if (![301, 302, 303, 307, 308].includes(res.status)) break;
+      const destino = res.headers.get('location');
+      await res.body?.cancel();
+      if (!destino) return null;
+      actual = new URL(destino, actual).href;
+      res = undefined;
+    }
+    if (!res) return null;
     if (!res.ok) return null;
     const tipo = (res.headers.get('content-type') ?? '').split(';')[0].trim();
     const ext = EXT[tipo];
     if (!ext) return null;
-    const datos = await res.arrayBuffer();
-    if (datos.byteLength === 0 || datos.byteLength > 5 * 1024 * 1024) return null;
+    if (!res.body || Number(res.headers.get('content-length')) > 5 * 1024 * 1024) {
+      await res.body?.cancel();
+      return null;
+    }
+    const reader = res.body.getReader();
+    const partes: Uint8Array[] = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > 5 * 1024 * 1024) { await reader.cancel(); return null; }
+      partes.push(value);
+    }
+    if (!total) return null;
+    const datos = new Uint8Array(total);
+    let offset = 0;
+    for (const parte of partes) { datos.set(parte, offset); offset += parte.byteLength; }
     const nombre = `${crypto.randomUUID()}.${ext}`;
     const { error } = await supabase.storage.from(BUCKET).upload(nombre, datos, {
       contentType: tipo,
@@ -41,6 +76,8 @@ export async function guardarPortadaDesdeUrl(url: string): Promise<string | null
     return supabase.storage.from(BUCKET).getPublicUrl(nombre).data.publicUrl;
   } catch {
     return null;
+  } finally {
+    clearTimeout(t);
   }
 }
 

@@ -83,6 +83,22 @@ export function sugerenciasDesde(libros: Libro[]): SugerenciasFormulario {
   };
 }
 
+// Las páginas públicas nunca consultan ubicaciones, préstamos ni notas internas.
+const CAMPOS_PUBLICOS = 'id,slug,titulo,autor,autores_extra,categoria,subcategorias,etiquetas,anio,anio_publicacion,idioma,editorial,edicion,isbn,paginas,formato,portada,sinopsis,sinopsis_en,valoracion,destacado,en_venta,precio,estado_conservacion,updated_at' as const;
+export type LibroPublico = Pick<Libro,
+  'id' | 'slug' | 'titulo' | 'autor' | 'autores_extra' | 'categoria' | 'subcategorias' |
+  'etiquetas' | 'anio' | 'anio_publicacion' | 'idioma' | 'editorial' | 'edicion' |
+  'isbn' | 'paginas' | 'formato' | 'portada' | 'sinopsis' | 'sinopsis_en' |
+  'valoracion' | 'destacado' | 'en_venta' | 'precio' | 'estado_conservacion' | 'updated_at'
+>;
+
+export async function listarLibrosPublicos(): Promise<LibroPublico[]> {
+  const { data, error } = await supabase.from('libros').select(CAMPOS_PUBLICOS)
+    .order('destacado', { ascending: false }).order('titulo', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ─── Lecturas ────────────────────────────────────────────────────────────────
 export async function listarLibros(): Promise<Libro[]> {
   const { data, error } = await supabase

@@ -19,7 +19,7 @@ function base64url(buf: ArrayBuffer): string {
 async function hmac(mensaje: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     'raw',
-    encoder.encode(AUTH_SECRET),
+    encoder.encode(`${AUTH_SECRET}|${ADMIN_PASSWORD}`),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign'],
@@ -51,7 +51,7 @@ export async function crearTokenSesion(): Promise<string> {
 
 /** Comprueba que el token está bien firmado y no ha caducado. */
 export async function sesionValida(token?: string): Promise<boolean> {
-  if (!token) return false;
+  if (!token || token.length > 100) return false;
   const punto = token.indexOf('.');
   if (punto < 1) return false;
   const payload = token.slice(0, punto);

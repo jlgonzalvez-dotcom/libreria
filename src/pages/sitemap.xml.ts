@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { listarLibros } from '../lib/libros';
+import { listarLibrosPublicos } from '../lib/libros';
 
 // Mapa del sitio para los buscadores: la portada + todas las fichas de libro,
 // en los dos idiomas. Cada entrada declara sus alternativas (hreflang) para que
@@ -8,7 +8,7 @@ import { listarLibros } from '../lib/libros';
 // Se genera al vuelo desde la base de datos (SSR), así siempre está al día.
 export const GET: APIRoute = async ({ site }) => {
   const base = site?.href ?? 'https://lalibreriadejl.vercel.app/';
-  const libros = await listarLibros();
+  const libros = await listarLibrosPublicos();
 
   // camino: ruta sin barra inicial ('' para la portada, 'libros/x/' para fichas)
   const entrada = (camino: string, lastmod = '') => {

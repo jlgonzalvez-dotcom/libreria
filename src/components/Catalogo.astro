@@ -4,7 +4,8 @@
 import { Image } from 'astro:assets';
 import { portadaOptimizable } from '../lib/imagenes';
 import Layout from '../layouts/Layout.astro';
-import { listarLibros } from '../lib/libros';
+import { jsonParaScript } from '../lib/seguridad';
+import { listarLibrosPublicos } from '../lib/libros';
 import { normalizarTexto } from '../lib/similitud';
 import { categoriaEn, contarLibros, ruta, textos, LOCALE_ORDEN, type Idioma } from '../lib/i18n';
 import { distintivoEdicion, titulosRepetidos } from '../lib/ediciones';
@@ -17,7 +18,7 @@ const t = textos(lang);
 const orden = LOCALE_ORDEN[lang];
 
 // SSR: se lee de la base de datos en cada petición.
-const libros = await listarLibros();
+const libros = await listarLibrosPublicos();
 
 // Las categorías se guardan en español; en la web inglesa se muestran
 // traducidas, pero el valor que viaja en los filtros sigue siendo el original.
@@ -131,7 +132,7 @@ const jsonLdColeccion = {
 ---
 
 <Layout lang={lang} titulo={t('titulo_inicio')} descripcion={t('descripcion_inicio')}>
-  <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLdColeccion)} />
+  <script type="application/ld+json" is:inline set:html={jsonParaScript(jsonLdColeccion)} />
   <section class="hero">
     <div class="contenedor hero-inner">
       <div class="hero-texto">

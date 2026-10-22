@@ -1,8 +1,9 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { passwordCorrecta, crearTokenSesion, sesionValida, COOKIE_SESION } from '../../lib/auth';
+import { destinoAdmin } from '../../lib/seguridad';
 
-const volver = Astro.url.searchParams.get('volver') || '/admin';
+const volver = destinoAdmin(Astro.url.searchParams.get('volver'));
 
 // Si ya hay sesión válida, no mostrar el login.
 if (await sesionValida(Astro.cookies.get(COOKIE_SESION)?.value)) {
@@ -21,7 +22,7 @@ if (Astro.request.method === 'POST') {
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     });
-    return Astro.redirect(String(datos.get('volver') || '/admin'));
+    return Astro.redirect(destinoAdmin(datos.get('volver')));
   }
   error = 'Contraseña incorrecta.';
 }

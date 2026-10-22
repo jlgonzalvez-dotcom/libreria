@@ -39,10 +39,11 @@ export default defineConfig({
     ],
   },
 
-  // Astro activa por defecto una comprobación anti-CSRF por Origin que, tras el
-  // proxy de Vercel, rechaza todos los POST de formularios (403). La desactivamos:
-  // la protección CSRF ya la dan las cookies de sesión con SameSite=Lax.
-  security: { checkOrigin: false },
+  // El middleware valida Origin también en las peticiones JSON del panel.
+  security: {
+    checkOrigin: true,
+    allowedDomains: [{ protocol: 'https', hostname: 'lalibreriadejl.vercel.app' }],
+  },
 
   // Variables de entorno tipadas y validadas (Astro las exige al arrancar).
   // Se definen en el archivo .env (local) y en el panel de Vercel (producción).

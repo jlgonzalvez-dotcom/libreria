@@ -11,7 +11,7 @@ import type { Libro } from './libros';
 import { normalizarTexto } from './similitud';
 
 /** Títulos que aparecen más de una vez en la colección (ya normalizados). */
-export function titulosRepetidos(libros: Libro[]): Set<string> {
+export function titulosRepetidos(libros: Pick<Libro, 'titulo'>[]): Set<string> {
   const cuenta = new Map<string, number>();
   for (const l of libros) {
     const clave = normalizarTexto(l.titulo);
@@ -24,7 +24,7 @@ export function titulosRepetidos(libros: Libro[]): Set<string> {
  * "Alma, 2023" para distinguir esta edición de la otra; `null` si el título no
  * se repite (que es el caso normal) o si no hay con qué distinguirla.
  */
-export function distintivoEdicion(libro: Libro, repetidos: Set<string>): string | null {
+export function distintivoEdicion(libro: Pick<Libro, 'titulo' | 'editorial' | 'anio' | 'anio_publicacion'>, repetidos: Set<string>): string | null {
   if (!repetidos.has(normalizarTexto(libro.titulo))) return null;
   const anio = libro.anio_publicacion ?? libro.anio;
   const partes = [editorialCorta(libro.editorial), anio ? String(anio) : null].filter(Boolean);

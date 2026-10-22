@@ -19,9 +19,8 @@ yarn-error.log*
 pnpm-debug.log*
 
 # variables de entorno
-.env
-.env.production
-.env.*.local
+.env*
+!.env.example
 
 # copias de seguridad del catálogo (CSV de /admin/exportar)
 copias/
@@ -39,3 +38,10 @@ __pycache__/
 
 # Configuración local de Claude Code (personal, no va al repo)
 .claude/
+
+# Inventarios y notas personales: se conservan fuera del repositorio
+ESTADO_DEL_PROYECTO.md
+otros-objetos.csv
+datos-privados/
+Inventario*.xlsx
+*.bundle

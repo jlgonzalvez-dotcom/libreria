@@ -1,11 +1,11 @@
 ---
 import FichaLibro from '../../components/FichaLibro.astro';
-import { listarLibros } from '../../lib/libros';
+import { listarLibrosPublicos } from '../../lib/libros';
 
 const { slug } = Astro.params;
 
 // Una sola consulta: el libro por su slug + el resto para "relacionados".
-const todos = await listarLibros();
+const todos = await listarLibrosPublicos();
 const libro = todos.find((l) => l.slug === slug) ?? null;
 
 if (!libro) {

@@ -2,7 +2,8 @@
 // Ficha de un libro. Se usa desde /libros/[slug]/ (español) y /en/libros/[slug]/
 // (inglés). La página es quien busca el libro y decide el 404; aquí solo se pinta.
 import Layout from '../layouts/Layout.astro';
-import type { Libro } from '../lib/libros';
+import { jsonParaScript } from '../lib/seguridad';
+import type { LibroPublico } from '../lib/libros';
 import { distintivoEdicion, titulosRepetidos } from '../lib/ediciones';
 import {
   categoriaEn, codigoIdioma, conservacionEn, formatoEn, idiomaLibroEn, ordinalEdicion, ruta, textos,
@@ -11,9 +12,9 @@ import {
 
 interface Props {
   lang: Idioma;
-  libro: Libro;
+  libro: LibroPublico;
   /** Toda la colección, ya cargada por la página (para los relacionados). */
-  todos: Libro[];
+  todos: LibroPublico[];
 }
 const { lang, libro, todos } = Astro.props;
 const t = textos(lang);
@@ -107,7 +108,7 @@ const jsonLd = {
   imagen={libro.portada}
   tipo="book"
 >
-  <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
+  <script type="application/ld+json" is:inline set:html={jsonParaScript(jsonLd)} />
   <section class="detalle">
     <div class="contenedor">
       <a class="volver" href={ruta(lang, '/')}>{t('volver')}</a>
